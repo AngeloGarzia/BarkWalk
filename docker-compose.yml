@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: barkwalk-postgres
+    environment:
+      POSTGRES_DB: barkwalk
+      POSTGRES_USER: barkwalk
+      POSTGRES_PASSWORD: barkwalk
+    ports:
+      - "5434:5432"
+    volumes:
+      - barkwalk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U barkwalk -d barkwalk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: barkwalk-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: barkwalk
+      MINIO_ROOT_PASSWORD: barkwalksecret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - barkwalk_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: barkwalk-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 barkwalk barkwalksecret;
+      mc mb --ignore-existing local/barkwalk-docs;
+      mc anonymous set none local/barkwalk-docs;
+      exit 0;
+      "
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: barkwalk-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  barkwalk_pgdata:
+  barkwalk_minio:

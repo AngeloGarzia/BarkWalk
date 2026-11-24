@@ -1,0 +1,62 @@
+<main class="page">
+  <header class="hero">
+    <p class="eyebrow">Full-stack · Spring Boot 4 · Angular</p>
+    <h1>{{ title() }}</h1>
+    <p class="lead">Gérez les chiens de votre promenade via l’API REST et PostgreSQL.</p>
+  </header>
+
+  @if (error()) {
+    <p class="banner error" role="alert">{{ error() }}</p>
+  }
+
+  <section class="panel" aria-labelledby="create-title">
+    <h2 id="create-title">Ajouter un chien</h2>
+    <form [formGroup]="form" (ngSubmit)="create()" class="form">
+      <label>
+        Nom
+        <input formControlName="name" type="text" autocomplete="off" />
+      </label>
+      <label>
+        Race
+        <input formControlName="breed" type="text" autocomplete="off" />
+      </label>
+      <label>
+        Âge (années)
+        <input formControlName="ageYears" type="number" min="0" max="40" />
+      </label>
+      <label>
+        Propriétaire
+        <input formControlName="ownerName" type="text" autocomplete="name" />
+      </label>
+      <button type="submit" [disabled]="form.invalid">Enregistrer</button>
+    </form>
+  </section>
+
+  <section class="panel" aria-labelledby="list-title">
+    <div class="panel-head">
+      <h2 id="list-title">Chiens</h2>
+      <button type="button" class="ghost" (click)="reload()" [disabled]="loading()">
+        Actualiser
+      </button>
+    </div>
+
+    @if (loading()) {
+      <p class="muted">Chargement…</p>
+    } @else if (dogs().length === 0) {
+      <p class="muted">Aucun chien pour le moment.</p>
+    } @else {
+      <ul class="dog-list">
+        @for (dog of dogs(); track dog.id) {
+          <li>
+            <div>
+              <strong>{{ dog.name }}</strong>
+              <span>{{ dog.breed }} · {{ dog.ageYears }} ans</span>
+              <span class="muted">{{ dog.ownerName }}</span>
+            </div>
+            <button type="button" class="danger" (click)="remove(dog.id)">Supprimer</button>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</main>

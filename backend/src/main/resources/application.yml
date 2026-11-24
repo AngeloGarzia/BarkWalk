@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: barkwalk-backend
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5434/barkwalk
+    username: barkwalk
+    password: barkwalk
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  docker:
+    compose:
+      # Compose est démarré manuellement (port hôte 5433 : 5432 déjà pris)
+      enabled: false
+      file: ../docker-compose.yml
+      lifecycle-management: start_only
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=10m
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+barkwalk:
+  cors:
+    allowed-origins: http://localhost:4200
+  jwt:
+    secret: ${JWT_SECRET:barkwalk-dev-secret-key-change-me-32chars-min}
+    access-token-minutes: 15
+    refresh-token-days: 14
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    access-key: ${S3_ACCESS_KEY:barkwalk}
+    secret-key: ${S3_SECRET_KEY:barkwalksecret}
+    bucket: ${S3_BUCKET:barkwalk-docs}
+    region: ${S3_REGION:eu-west-3}
+    signed-url-minutes: 15
+  stripe:
+    api-key: ${STRIPE_API_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  mail:
+    from: ${MAIL_FROM:noreply@barkwalk.local}
+  demo:
+    seed-users: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.springframework.security: INFO
+    com.barkwalk: INFO
