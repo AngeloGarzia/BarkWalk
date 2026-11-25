@@ -2,6 +2,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
+import { rolesFromToken } from './jwt';
 
 export interface AuthResponse {
   accessToken: string;
@@ -34,7 +35,8 @@ export class AuthService {
 
   private _token: string | null = localStorage.getItem(ACCESS_KEY);
   readonly loggedIn = signal(!!this._token);
-  readonly roles = signal<string[]>([]);
+  // Relu depuis le JWT pour survivre à un rechargement de page.
+  readonly roles = signal<string[]>(rolesFromToken(this._token));
 
   getToken(): string | null {
     return this._token;
