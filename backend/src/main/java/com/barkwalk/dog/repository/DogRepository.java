@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Accès aux chiens d'un propriétaire.
 
 public interface DogRepository extends JpaRepository<Dog, Long> {
     List<Dog> findByOwnerIdOrderByNameAsc(Long ownerId);

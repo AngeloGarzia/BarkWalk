@@ -1,7 +1,8 @@
-package com.barkwalk.user.web;
+package com.barkwalk.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+// DTO profil.
 
 public final class ProfileDtos {
     private ProfileDtos() {}

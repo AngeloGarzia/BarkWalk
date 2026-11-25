@@ -3,6 +3,7 @@ package com.barkwalk.payment.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Versement vers un indépendant (Stripe Connect).
 @Entity
 @Table(name = "payouts")
 public class Payout {

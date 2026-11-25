@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
-import com.barkwalk.booking.service.BookingService.BookingRequest;
+import com.barkwalk.booking.dto.BookingDtos.BookingRequest;
 import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;

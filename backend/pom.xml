@@ -184,6 +184,12 @@
             <version>2.4.2</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.4.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -307,7 +313,9 @@
                                         <include>com.barkwalk.booking.service</include>
                                         <include>com.barkwalk.walk.service</include>
                                         <include>com.barkwalk.dog.service</include>
-                                        <include>com.barkwalk.payment.web</include>
+                                        <include>com.barkwalk.payment.service</include>
+                                        <include>com.barkwalk.membership.service</include>
+                                        <include>com.barkwalk.walker.service</include>
                                     </includes>
                                     <limits>
                                         <limit>

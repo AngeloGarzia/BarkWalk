@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Pointages par réservation.
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     Optional<Attendance> findByBookingId(Long bookingId);

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Accès aux points de rendez-vous actifs par ville.
 
 public interface MeetingPointRepository extends JpaRepository<MeetingPoint, Long> {
     List<MeetingPoint> findByCityIdAndActiveTrue(Long cityId);

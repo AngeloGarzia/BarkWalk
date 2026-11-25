@@ -3,6 +3,7 @@ package com.barkwalk.admin.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Page de contenu versionnée (CGU, FAQ, charte).
 @Entity
 @Table(name = "content_pages")
 public class ContentPage {

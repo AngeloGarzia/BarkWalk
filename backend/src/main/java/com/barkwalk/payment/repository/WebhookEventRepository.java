@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Idempotence des webhooks.
 
 public interface WebhookEventRepository extends JpaRepository<WebhookEvent, Long> {
     boolean existsByProviderAndEventId(String provider, String eventId);

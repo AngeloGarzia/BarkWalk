@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Recherche textuelle sur communes.
 
 public interface CityRepository extends JpaRepository<City, Long> {
     @Query("""

@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 
+// Pièce jointe du dossier (vaccin, assurance, etc.), stockée hors base.
 @Entity
 @Table(name = "dog_documents")
 public class DogDocument {

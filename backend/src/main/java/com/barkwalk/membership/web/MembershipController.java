@@ -1,10 +1,8 @@
 package com.barkwalk.membership.web;
 
-import com.barkwalk.common.SecurityUtils;
-import com.barkwalk.membership.domain.Membership;
-import com.barkwalk.membership.domain.MembershipPlan;
-import com.barkwalk.membership.repository.MembershipPlanRepository;
-import com.barkwalk.membership.repository.MembershipRepository;
+import com.barkwalk.membership.dto.MembershipDtos.MembershipResponse;
+import com.barkwalk.membership.dto.MembershipDtos.PlanResponse;
+import com.barkwalk.membership.service.MembershipService;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,20 +12,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/memberships")
 public class MembershipController {
-    private final MembershipPlanRepository planRepository;
-    private final MembershipRepository membershipRepository;
+    private final MembershipService membershipService;
 
-    public MembershipController(MembershipPlanRepository planRepository, MembershipRepository membershipRepository) {
-        this.planRepository = planRepository;
-        this.membershipRepository = membershipRepository;
+    public MembershipController(MembershipService membershipService) {
+        this.membershipService = membershipService;
     }
 
     @GetMapping("/plans")
-    public List<MembershipPlan> plans() { return planRepository.findByActiveTrue(); }
+    public List<PlanResponse> plans() {
+        return membershipService.activePlans();
+    }
 
     @GetMapping("/me")
-    public Optional<Membership> mine() {
-        return membershipRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
-                SecurityUtils.currentUserId(), "ACTIVE");
+    public Optional<MembershipResponse> mine() {
+        return membershipService.mine();
     }
 }

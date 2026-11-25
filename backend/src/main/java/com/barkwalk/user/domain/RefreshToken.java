@@ -3,6 +3,7 @@ package com.barkwalk.user.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Empreinte d'un refresh token, avec famille pour détecter une réutilisation.
 @Entity
 @Table(name = "refresh_tokens")
 public class RefreshToken {

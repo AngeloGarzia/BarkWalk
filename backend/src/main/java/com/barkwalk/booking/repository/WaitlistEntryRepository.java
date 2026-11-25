@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Gestion de la file d'attente par balade.
 
 public interface WaitlistEntryRepository extends JpaRepository<WaitlistEntry, Long> {
     List<WaitlistEntry> findByWalkIdAndStatusOrderByPositionAsc(Long walkId, String status);

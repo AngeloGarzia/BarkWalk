@@ -5,8 +5,8 @@ import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.domain.User;
 import com.barkwalk.user.repository.ProfileRepository;
 import com.barkwalk.user.repository.UserRepository;
-import com.barkwalk.user.web.ProfileDtos.ProfileResponse;
-import com.barkwalk.user.web.ProfileDtos.ProfileUpdateRequest;
+import com.barkwalk.user.dto.ProfileDtos.ProfileResponse;
+import com.barkwalk.user.dto.ProfileDtos.ProfileUpdateRequest;
 import java.time.Instant;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// Lecture et mise à jour du profil de l'utilisateur connecté.
 @Service
 public class ProfileService {
     private final ProfileRepository profileRepository;

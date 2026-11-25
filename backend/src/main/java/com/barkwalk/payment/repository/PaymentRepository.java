@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Accès paiements.
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findByUserIdOrderByCreatedAtDesc(Long userId);

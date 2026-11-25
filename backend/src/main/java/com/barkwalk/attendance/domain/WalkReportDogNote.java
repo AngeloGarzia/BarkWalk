@@ -2,6 +2,7 @@ package com.barkwalk.attendance.domain;
 
 import jakarta.persistence.*;
 
+// Note comportementale par chien dans un compte-rendu.
 @Entity
 @Table(name = "walk_report_dog_notes")
 public class WalkReportDogNote {

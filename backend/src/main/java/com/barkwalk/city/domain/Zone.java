@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+// Quartier ou zone rattachée à une ville.
 @Entity
 @Table(name = "zones")
 public class Zone {

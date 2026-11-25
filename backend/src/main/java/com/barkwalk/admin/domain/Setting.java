@@ -3,6 +3,7 @@ package com.barkwalk.admin.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Paramètre métier modifiable (délais, plafonds, commissions).
 @Entity
 @Table(name = "settings")
 public class Setting {

@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 
+// Blocage d'un utilisateur par un autre.
 @Entity
 @Table(name = "user_blocks")
 @IdClass(UserBlock.Pk.class)

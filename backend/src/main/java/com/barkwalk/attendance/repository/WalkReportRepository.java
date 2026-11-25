@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Compte-rendus par balade.
 
 public interface WalkReportRepository extends JpaRepository<WalkReport, Long> {
     Optional<WalkReport> findByWalkId(Long walkId);

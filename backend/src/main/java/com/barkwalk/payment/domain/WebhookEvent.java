@@ -3,6 +3,7 @@ package com.barkwalk.payment.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Événement webhook traité une seule fois (idempotence provider + event_id).
 @Entity
 @Table(name = "webhook_events")
 public class WebhookEvent {

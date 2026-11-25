@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+// Point de rendez-vous GPS rattaché à une commune.
 @Entity
 @Table(name = "meeting_points")
 public class MeetingPoint {

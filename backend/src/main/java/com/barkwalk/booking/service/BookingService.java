@@ -2,6 +2,8 @@ package com.barkwalk.booking.service;
 
 import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.domain.WaitlistEntry;
+import com.barkwalk.booking.dto.BookingDtos.BookingRequest;
+import com.barkwalk.booking.dto.BookingDtos.BookingResponse;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
 import com.barkwalk.common.Role;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// Réservation transactionnelle : compatibilité chien, capacité, paiement éventuel, liste d'attente.
 @Service
 public class BookingService {
     private final BookingRepository bookingRepository;
@@ -34,10 +37,7 @@ public class BookingService {
         this.dogRepository = dogRepository;
     }
 
-    public record BookingRequest(Long walkId, Long dogId, boolean communityAck, boolean trial) {}
-    public record BookingResponse(Long id, Long walkId, Long dogId, String status, int priceCents,
-                                  boolean paymentRequired, Instant confirmedAt) {}
-
+    // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
     @Transactional
     public BookingResponse create(BookingRequest request) {
         Long userId = SecurityUtils.currentUserId();
@@ -105,6 +105,7 @@ public class BookingService {
         booking.setPaymentRequired(paymentRequired);
         if (paymentRequired) {
             booking.setStatus("PENDING_PAYMENT");
+            // Place libérable après 15 minutes sans paiement (job / libération R6).
             booking.setPaymentExpiresAt(Instant.now().plus(Duration.ofMinutes(15)));
         } else {
             booking.setStatus("CONFIRMED");
@@ -128,8 +129,8 @@ public class BookingService {
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        // R4 détaillée (gratuit vs tardif + comptage) sera finalisée côté job/règle starts_at ;
-        // défaut conservateur : annulation utilisateur = FREE si >24h avant le départ (appliqué en étape service ultérieure).
+        // Pour l'instant toute annulation utilisateur est marquée gratuite.
+        // Le basculement tardif (comptage quota et seuil organisateur) se calcule à partir de starts_at.
         booking.setStatus("CANCELLED_FREE");
         booking.setCancelledAt(Instant.now());
         booking.setCancelledByUserId(SecurityUtils.currentUserId());

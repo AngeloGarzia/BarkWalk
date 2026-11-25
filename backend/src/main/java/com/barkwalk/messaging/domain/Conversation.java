@@ -3,6 +3,7 @@ package com.barkwalk.messaging.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Fil de discussion (balade, support, direct).
 @Entity
 @Table(name = "conversations")
 public class Conversation {

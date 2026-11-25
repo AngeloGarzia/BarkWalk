@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Membres d'une conversation.
 
 public interface ConversationMemberRepository extends JpaRepository<ConversationMember, com.barkwalk.messaging.domain.ConversationMember.Pk> {
     List<ConversationMember> findByUserId(Long userId);

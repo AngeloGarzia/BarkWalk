@@ -3,6 +3,7 @@ package com.barkwalk.moderation.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Signalement générique (cible typée + statut de traitement).
 @Entity
 @Table(name = "reports")
 public class Report {

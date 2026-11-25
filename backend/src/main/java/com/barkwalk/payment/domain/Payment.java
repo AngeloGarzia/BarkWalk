@@ -1,8 +1,10 @@
 package com.barkwalk.payment.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Mouvement financier (réservation ou adhésion). Le cœur du montant n'est pas modifiable après coup.
 @Entity
 @Table(name = "payments")
 public class Payment {
@@ -14,8 +16,8 @@ public class Payment {
     @Column(nullable = false) private String currency = "EUR";
     @Column(name = "payment_type", nullable = false) private String paymentType;
     @Column(nullable = false) private String status;
-    @Column(name = "stripe_payment_intent") private String stripePaymentIntent;
-    @Column(name = "commission_cents", nullable = false) private int commissionCents;
+    @JsonIgnore @Column(name = "stripe_payment_intent") private String stripePaymentIntent;
+    @JsonIgnore @Column(name = "commission_cents", nullable = false) private int commissionCents;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
     public Long getId() { return id; }
     public Long getUserId() { return userId; }

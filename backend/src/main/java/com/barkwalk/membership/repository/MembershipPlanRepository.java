@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Plans actifs.
 
 public interface MembershipPlanRepository extends JpaRepository<MembershipPlan, Long> {
     List<MembershipPlan> findByActiveTrue();

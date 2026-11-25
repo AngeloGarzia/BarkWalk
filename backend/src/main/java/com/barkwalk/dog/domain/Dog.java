@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
+// Fiche chien et statut de dossier.
 @Entity
 @Table(name = "dogs")
 public class Dog {

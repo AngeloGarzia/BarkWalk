@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Accès avis.
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
     boolean existsByWalkIdAndAuthorIdAndTargetUserId(Long walkId, Long authorId, Long targetUserId);

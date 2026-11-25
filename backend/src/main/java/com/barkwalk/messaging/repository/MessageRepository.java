@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Messages d'une conversation.
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Message> findByConversationIdOrderByCreatedAtAsc(Long conversationId);

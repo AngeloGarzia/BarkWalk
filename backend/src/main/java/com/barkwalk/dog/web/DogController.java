@@ -1,15 +1,16 @@
 package com.barkwalk.dog.web;
 
 import com.barkwalk.dog.service.DogService;
-import com.barkwalk.dog.web.DogDtos.DogRequest;
-import com.barkwalk.dog.web.DogDtos.DogResponse;
-import com.barkwalk.dog.web.DogDtos.DocumentRequest;
-import com.barkwalk.dog.web.DogDtos.DocumentResponse;
+import com.barkwalk.dog.dto.DogDtos.DogRequest;
+import com.barkwalk.dog.dto.DogDtos.DogResponse;
+import com.barkwalk.dog.dto.DogDtos.DocumentRequest;
+import com.barkwalk.dog.dto.DogDtos.DocumentResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+// API propriétaire pour les chiens.
 @RestController
 @RequestMapping("/api/dogs")
 public class DogController {

@@ -7,10 +7,10 @@ import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.domain.DogDocument;
 import com.barkwalk.dog.repository.DogDocumentRepository;
 import com.barkwalk.dog.repository.DogRepository;
-import com.barkwalk.dog.web.DogDtos.DogRequest;
-import com.barkwalk.dog.web.DogDtos.DogResponse;
-import com.barkwalk.dog.web.DogDtos.DocumentRequest;
-import com.barkwalk.dog.web.DogDtos.DocumentResponse;
+import com.barkwalk.dog.dto.DogDtos.DogRequest;
+import com.barkwalk.dog.dto.DogDtos.DogResponse;
+import com.barkwalk.dog.dto.DogDtos.DocumentRequest;
+import com.barkwalk.dog.dto.DogDtos.DocumentResponse;
 import com.barkwalk.storage.StorageService;
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// CRUD chiens et pièces du dossier (propriétaire uniquement).
 @Service
 public class DogService {
     private final DogRepository dogRepository;
@@ -103,15 +104,21 @@ public class DogService {
     @Transactional
     public DocumentResponse addDocument(Long dogId, DocumentRequest request) {
         owned(dogId);
+        String storageKey = storageService.createObjectKey("dogs/" + dogId, request.filename());
         DogDocument doc = new DogDocument();
         doc.setDogId(dogId);
         doc.setDocType(request.docType());
-        doc.setStorageKey(request.storageKey());
+        doc.setStorageKey(storageKey);
         doc.setExpiresAt(request.expiresAt());
         doc.setStatus("PENDING");
         doc = documentRepository.save(doc);
-        return new DocumentResponse(doc.getId(), doc.getDocType(), doc.getStorageKey(),
-                storageService.signedGetUrl(doc.getStorageKey()), doc.getExpiresAt(), doc.getStatus());
+        return new DocumentResponse(
+                doc.getId(),
+                doc.getDocType(),
+                storageService.signedGetUrl(storageKey),
+                storageService.signedPutUrl(storageKey),
+                doc.getExpiresAt(),
+                doc.getStatus());
     }
 
     @Transactional(readOnly = true)
@@ -122,8 +129,13 @@ public class DogService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         return documentRepository.findByDogId(dogId).stream()
-                .map(d -> new DocumentResponse(d.getId(), d.getDocType(), d.getStorageKey(),
-                        storageService.signedGetUrl(d.getStorageKey()), d.getExpiresAt(), d.getStatus()))
+                .map(d -> new DocumentResponse(
+                        d.getId(),
+                        d.getDocType(),
+                        storageService.signedGetUrl(d.getStorageKey()),
+                        null,
+                        d.getExpiresAt(),
+                        d.getStatus()))
                 .toList();
     }
 

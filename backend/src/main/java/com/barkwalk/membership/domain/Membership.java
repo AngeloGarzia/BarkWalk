@@ -1,8 +1,10 @@
 package com.barkwalk.membership.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Abonnement en cours d'un utilisateur.
 @Entity
 @Table(name = "memberships")
 public class Membership {
@@ -12,8 +14,8 @@ public class Membership {
     @Column(nullable = false) private String status;
     @Column(name = "current_period_start") private Instant currentPeriodStart;
     @Column(name = "current_period_end") private Instant currentPeriodEnd;
-    @Column(name = "stripe_subscription_id") private String stripeSubscriptionId;
-    @Column(name = "stripe_customer_id") private String stripeCustomerId;
+    @JsonIgnore @Column(name = "stripe_subscription_id") private String stripeSubscriptionId;
+    @JsonIgnore @Column(name = "stripe_customer_id") private String stripeCustomerId;
     @Column(name = "cancel_at_period_end", nullable = false) private boolean cancelAtPeriodEnd;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
     @Column(name = "updated_at", nullable = false) private Instant updatedAt = Instant.now();

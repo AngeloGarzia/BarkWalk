@@ -3,6 +3,7 @@ package com.barkwalk.booking.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Place en file d'attente lorsqu'une balade est complète.
 @Entity
 @Table(name = "waitlist_entries")
 public class WaitlistEntry {

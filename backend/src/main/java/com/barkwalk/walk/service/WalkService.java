@@ -13,8 +13,8 @@ import com.barkwalk.walk.domain.MeetingPoint;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
-import com.barkwalk.walk.web.WalkDtos.WalkCreateRequest;
-import com.barkwalk.walk.web.WalkDtos.WalkResponse;
+import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
+import com.barkwalk.walk.dto.WalkDtos.WalkResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// Catalogue et création de balades (encadrées ou communautaires).
 @Service
 public class WalkService {
     private final WalkRepository walkRepository;
@@ -59,6 +60,7 @@ public class WalkService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)));
     }
 
+    // Communautaire : organisateur éligible ou actif. Encadrée : staff / indépendant / admin.
     @Transactional
     public WalkResponse create(WalkCreateRequest request) {
         var principal = SecurityUtils.currentUser();

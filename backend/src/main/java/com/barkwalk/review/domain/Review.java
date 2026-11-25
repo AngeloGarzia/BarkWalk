@@ -3,6 +3,7 @@ package com.barkwalk.review.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Avis noté entre participants ou envers un encadrant, soumis à une fenêtre de 14 jours en base.
 @Entity
 @Table(name = "reviews")
 public class Review {

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Notes chiens d'un compte-rendu.
 
 public interface WalkReportDogNoteRepository extends JpaRepository<WalkReportDogNote, Long> {
     List<WalkReportDogNote> findByReportId(Long reportId);

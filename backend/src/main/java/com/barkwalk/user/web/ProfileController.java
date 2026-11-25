@@ -1,11 +1,12 @@
 package com.barkwalk.user.web;
 
 import com.barkwalk.user.service.ProfileService;
-import com.barkwalk.user.web.ProfileDtos.ProfileResponse;
-import com.barkwalk.user.web.ProfileDtos.ProfileUpdateRequest;
+import com.barkwalk.user.dto.ProfileDtos.ProfileResponse;
+import com.barkwalk.user.dto.ProfileDtos.ProfileUpdateRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+// API profil.
 @RestController
 @RequestMapping("/api/me")
 public class ProfileController {

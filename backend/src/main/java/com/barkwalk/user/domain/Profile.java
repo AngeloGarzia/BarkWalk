@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
+// Profil nominal (coordonnées, ville, statut organisateur communautaire).
 @Entity
 @Table(name = "profiles")
 public class Profile {

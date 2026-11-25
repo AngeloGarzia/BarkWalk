@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
+// Réservation d'un chien sur une balade (statuts, essai, annulation, expiration paiement).
 @Entity
 @Table(name = "bookings")
 public class Booking {

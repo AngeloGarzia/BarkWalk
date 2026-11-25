@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+// Commune du référentiel (INSEE, CP, GPS).
 @Entity
 @Table(name = "cities")
 public class City {

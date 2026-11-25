@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Accès données du module messaging. Messagerie.
 
 public interface UserBlockRepository extends JpaRepository<UserBlock, com.barkwalk.messaging.domain.UserBlock.Pk> {
     boolean existsByBlockerIdAndBlockedId(Long blockerId, Long blockedId);

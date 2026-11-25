@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Accès données du module city. Référentiel géographique.
 
 public interface ZoneRepository extends JpaRepository<Zone, Long> {
     List<Zone> findByCityIdOrderByNameAsc(Long cityId);

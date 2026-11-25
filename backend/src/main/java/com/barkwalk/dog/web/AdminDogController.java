@@ -1,12 +1,13 @@
 package com.barkwalk.dog.web;
 
 import com.barkwalk.dog.service.DogService;
-import com.barkwalk.dog.web.DogDtos.DogResponse;
-import com.barkwalk.dog.web.DogDtos.RefuseRequest;
+import com.barkwalk.dog.dto.DogDtos.DogResponse;
+import com.barkwalk.dog.dto.DogDtos.RefuseRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.*;
 
+// Validation administrative des dossiers chiens.
 @RestController
 @RequestMapping("/api/admin/dogs")
 public class AdminDogController {

@@ -1,7 +1,9 @@
 package com.barkwalk.membership.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
+// Offre tarifaire d'adhésion.
 @Entity
 @Table(name = "membership_plans")
 public class MembershipPlan {
@@ -12,7 +14,7 @@ public class MembershipPlan {
     @Column(name = "price_cents", nullable = false) private int priceCents;
     @Column(nullable = false) private String currency = "EUR";
     @Column(name = "interval_unit", nullable = false) private String intervalUnit;
-    @Column(name = "stripe_price_id") private String stripePriceId;
+    @JsonIgnore @Column(name = "stripe_price_id") private String stripePriceId;
     @Column(nullable = false) private boolean active = true;
     public Long getId() { return id; }
     public String getCode() { return code; }

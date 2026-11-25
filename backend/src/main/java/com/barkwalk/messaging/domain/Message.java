@@ -3,6 +3,7 @@ package com.barkwalk.messaging.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Message texte ou média dans une conversation.
 @Entity
 @Table(name = "messages")
 public class Message {

@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
+// Compte-rendu global d'une balade (les incidents vivent dans une table dédiée).
 @Entity
 @Table(name = "walk_reports")
 public class WalkReport {

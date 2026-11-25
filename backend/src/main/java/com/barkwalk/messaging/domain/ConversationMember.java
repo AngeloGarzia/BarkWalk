@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.io.Serializable;
 import java.util.Objects;
 
+// Participant à une conversation, avec horodatage de lecture.
 @Entity
 @Table(name = "conversation_members")
 @IdClass(ConversationMember.Pk.class)

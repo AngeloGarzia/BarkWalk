@@ -3,6 +3,7 @@ package com.barkwalk.attendance.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Présence liée à une réservation.
 @Entity
 @Table(name = "attendance")
 public class Attendance {

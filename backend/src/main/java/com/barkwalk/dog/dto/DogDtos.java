@@ -1,7 +1,6 @@
-package com.barkwalk.dog.web;
+package com.barkwalk.dog.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -35,7 +34,7 @@ public final class DogDtos {
             String attentionNotes, String dangerCategory, String dossierStatus, String refusalReason, Instant createdAt
     ) {}
 
-    public record DocumentRequest(@NotBlank String docType, @NotBlank String storageKey, LocalDate expiresAt) {}
-    public record DocumentResponse(Long id, String docType, String storageKey, String signedUrl, LocalDate expiresAt, String status) {}
+    public record DocumentRequest(@NotBlank String docType, @NotBlank String filename, LocalDate expiresAt) {}
+    public record DocumentResponse(Long id, String docType, String signedUrl, String uploadUrl, LocalDate expiresAt, String status) {}
     public record RefuseRequest(@NotBlank String reason) {}
 }

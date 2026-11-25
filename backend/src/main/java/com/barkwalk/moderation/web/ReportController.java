@@ -1,59 +1,37 @@
 package com.barkwalk.moderation.web;
 
-import com.barkwalk.common.AuditService;
-import com.barkwalk.common.SecurityUtils;
-import com.barkwalk.moderation.domain.Report;
-import com.barkwalk.moderation.repository.ReportRepository;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import java.time.Instant;
+import com.barkwalk.moderation.dto.ModerationDtos.CreateReportRequest;
+import com.barkwalk.moderation.dto.ModerationDtos.DecideRequest;
+import com.barkwalk.moderation.dto.ModerationDtos.ReportResponse;
+import com.barkwalk.moderation.service.ModerationService;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/reports")
 public class ReportController {
-    private final ReportRepository reportRepository;
-    private final AuditService auditService;
+    private final ModerationService moderationService;
 
-    public ReportController(ReportRepository reportRepository, AuditService auditService) {
-        this.reportRepository = reportRepository;
-        this.auditService = auditService;
+    public ReportController(ModerationService moderationService) {
+        this.moderationService = moderationService;
     }
 
-    public record CreateReport(@NotBlank String targetType, @NotNull Long targetId, @NotBlank String reason) {}
-    public record DecideRequest(@NotBlank String decision) {}
-
     @PostMapping
-    @Transactional
-    public Report create(@RequestBody CreateReport body) {
-        Report report = new Report();
-        report.setReporterId(SecurityUtils.currentUserId());
-        report.setTargetType(body.targetType());
-        report.setTargetId(body.targetId());
-        report.setReason(body.reason());
-        report.setStatus("OPEN");
-        return reportRepository.save(report);
+    public ReportResponse create(@Valid @RequestBody CreateReportRequest body) {
+        return moderationService.create(body);
     }
 
     @GetMapping("/open")
     @PreAuthorize("hasRole('ADMIN')")
-    public List<Report> open() {
-        return reportRepository.findByStatusOrderByCreatedAtDesc("OPEN");
+    public List<ReportResponse> open() {
+        return moderationService.openReports();
     }
 
     @PostMapping("/{id}/decide")
     @PreAuthorize("hasRole('ADMIN')")
-    @Transactional
-    public Report decide(@PathVariable Long id, @RequestBody DecideRequest body) {
-        Report report = reportRepository.findById(id).orElseThrow();
-        report.setStatus("CLOSED");
-        report.setDecision(body.decision());
-        report.setDecidedBy(SecurityUtils.currentUserId());
-        report.setDecidedAt(Instant.now());
-        auditService.log(SecurityUtils.currentUserId(), "REPORT_DECIDE", "REPORT", id, body.decision());
-        return report;
+    public ReportResponse decide(@PathVariable Long id, @Valid @RequestBody DecideRequest body) {
+        return moderationService.decide(id, body);
     }
 }

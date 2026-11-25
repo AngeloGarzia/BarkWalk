@@ -1,6 +1,7 @@
 package com.barkwalk.user.domain;
 
 import com.barkwalk.common.Role;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
+// Compte authentifié. L'e-mail est normalisé en minuscules à l'inscription.
 @Entity
 @Table(name = "users")
 public class User {
@@ -28,6 +30,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @JsonIgnore
     @Column(name = "password_hash")
     private String passwordHash;
 

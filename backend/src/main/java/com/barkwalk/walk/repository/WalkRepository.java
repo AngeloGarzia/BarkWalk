@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Requêtes catalogue et verrou pessimiste pour la réservation.
 
 public interface WalkRepository extends JpaRepository<Walk, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)

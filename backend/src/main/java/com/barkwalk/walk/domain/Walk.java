@@ -10,6 +10,7 @@ import java.time.Instant;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+// Balade planifiée : lieu, créneau, capacité, filtres chiens, encadrant ou organisateur.
 @Entity
 @Table(name = "walks")
 public class Walk {
@@ -225,7 +226,7 @@ public class Walk {
         this.routeHint = routeHint;
     }
 
-    /** Disclaimer communautaire dérivé du type de balade (plus de colonne dédiée). */
+    // Disclaimer communautaire : dérivé du type, plus de colonne dédiée en base.
     public boolean isCommunityDisclaimerRequired() {
         return "COMMUNITY".equals(walkType);
     }

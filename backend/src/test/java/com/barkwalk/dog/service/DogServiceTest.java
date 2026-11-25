@@ -13,8 +13,8 @@ import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.domain.DogDocument;
 import com.barkwalk.dog.repository.DogDocumentRepository;
 import com.barkwalk.dog.repository.DogRepository;
-import com.barkwalk.dog.web.DogDtos.DogRequest;
-import com.barkwalk.dog.web.DogDtos.DocumentRequest;
+import com.barkwalk.dog.dto.DogDtos.DogRequest;
+import com.barkwalk.dog.dto.DogDtos.DocumentRequest;
 import com.barkwalk.storage.StorageService;
 import com.barkwalk.support.SecurityTestSupport;
 import java.math.BigDecimal;
@@ -127,9 +127,13 @@ class DogServiceTest {
             setId(d, 20L);
             return d;
         });
-        when(storageService.signedGetUrl("key")).thenReturn("https://signed");
-        var doc = dogService.addDocument(5L, new DocumentRequest("VACCINE", "key", LocalDate.now().plusYears(1)));
+        when(storageService.createObjectKey(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn("dogs/5/uuid-vaccine.pdf");
+        when(storageService.signedPutUrl("dogs/5/uuid-vaccine.pdf")).thenReturn("https://put");
+        when(storageService.signedGetUrl("dogs/5/uuid-vaccine.pdf")).thenReturn("https://signed");
+        var doc = dogService.addDocument(5L, new DocumentRequest("VACCINE", "vaccine.pdf", LocalDate.now().plusYears(1)));
         assertThat(doc.signedUrl()).isEqualTo("https://signed");
+        assertThat(doc.uploadUrl()).isEqualTo("https://put");
 
         when(documentRepository.findByDogId(5L)).thenReturn(List.of());
         assertThat(dogService.documents(5L)).isEmpty();

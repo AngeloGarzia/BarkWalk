@@ -1,21 +1,23 @@
 package com.barkwalk.walker.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
+// Profil promeneur (salarié ou indépendant).
 @Entity
 @Table(name = "walker_profiles")
 public class WalkerProfile {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
     @Column(name = "user_id", nullable = false, unique = true) private Long userId;
     @Column(name = "walker_type", nullable = false) private String walkerType;
-    private String siret;
-    @Column(name = "diploma_key") private String diplomaKey;
-    @Column(name = "rc_pro_key") private String rcProKey;
+    @JsonIgnore private String siret;
+    @JsonIgnore @Column(name = "diploma_key") private String diplomaKey;
+    @JsonIgnore @Column(name = "rc_pro_key") private String rcProKey;
     @Column(name = "rc_pro_expires_at") private LocalDate rcProExpiresAt;
-    @Column(name = "stripe_connect_account") private String stripeConnectAccount;
+    @JsonIgnore @Column(name = "stripe_connect_account") private String stripeConnectAccount;
     @Column(name = "charter_signed_at") private Instant charterSignedAt;
     @Column(nullable = false) private String status = "PENDING";
     private String bio;

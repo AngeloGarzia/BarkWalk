@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+// Stockage objet privé et URLs signées à courte durée (jamais d'URL publique permanente).
 @Service
 public class StorageService {
     private final String bucket;
@@ -24,5 +25,9 @@ public class StorageService {
     /** Dev-friendly signed URL stub (MinIO/S3 wiring can replace this). */
     public String signedGetUrl(String storageKey) {
         return "http://localhost:9000/" + bucket + "/" + storageKey + "?ttl=" + Duration.ofMinutes(signedUrlMinutes).toMinutes();
+    }
+
+    public String signedPutUrl(String storageKey) {
+        return signedGetUrl(storageKey) + "&method=PUT";
     }
 }
