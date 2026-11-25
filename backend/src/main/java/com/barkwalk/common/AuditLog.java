@@ -3,6 +3,7 @@ package com.barkwalk.common;
 import jakarta.persistence.*;
 import java.time.Instant;
 
+// Entrée d'audit append-only : qui a fait quoi, sur quelle entité.
 @Entity
 @Table(name = "audit_log")
 public class AuditLog {

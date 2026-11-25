@@ -1,7 +1,12 @@
-// BarkWalk MCD/MLD post étapes 1–5 — https://dbdiagram.io
+// BarkWalk MCD/MLD — aligné Flyway V1→V6 (source de vérité schéma)
 // R4: annulation tardive comptée = org threshold + membership quota
+// https://dbdiagram.io
 
-Table City {
+// ---------------------------------------------------------------------------
+// Référentiel géographique
+// ---------------------------------------------------------------------------
+
+Table cities {
   id bigint [pk, increment]
   insee_code varchar(5) [not null]
   postal_code varchar(5) [not null]
@@ -10,108 +15,164 @@ Table City {
   region varchar(100) [not null]
   lat double
   lng double
-  active boolean [not null]
+  active boolean [not null, default: true]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'UNIQUE(insee_code, postal_code)'
 }
 
-Table Zone {
+Table zones {
   id bigint [pk, increment]
-  city_id bigint [not null, ref: > City.id]
+  city_id bigint [not null, ref: > cities.id]
   name varchar(120) [not null]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'UNIQUE(city_id, name)'
 }
 
-Table User {
+// ---------------------------------------------------------------------------
+// Comptes & auth
+// ---------------------------------------------------------------------------
+
+Table users {
   id bigint [pk, increment]
   public_id uuid [unique, not null]
   email varchar(255) [not null, note: 'unique lower(email)']
   password_hash varchar(255)
-  password_algo varchar(40) [not null, note: 'BCRYPT|ARGON2ID']
-  email_verified boolean [not null]
-  enabled boolean [not null]
-  deleted boolean [not null]
+  password_algo varchar(40) [not null, default: 'BCRYPT', note: 'BCRYPT|ARGON2ID']
+  email_verified boolean [not null, default: false]
+  enabled boolean [not null, default: true]
+  deleted boolean [not null, default: false]
   deleted_at timestamptz
   anonymized_at timestamptz
-  failed_login_attempts int [not null]
+  failed_login_attempts int [not null, default: 0]
   locked_until timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table UserRole {
-  user_id bigint [not null, ref: > User.id]
+Table user_roles {
+  user_id bigint [not null, ref: > users.id]
   role varchar(40) [not null]
   created_at timestamptz [not null]
-  indexes { (user_id, role) [pk] }
+
+  indexes {
+    (user_id, role) [pk]
+  }
 }
 
-Table RefreshToken {
+Table oauth_accounts {
   id bigint [pk, increment]
-  user_id bigint [not null, ref: > User.id]
+  user_id bigint [not null, ref: > users.id]
+  provider varchar(40) [not null]
+  provider_user_id varchar(255) [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'UNIQUE(provider, provider_user_id)'
+}
+
+Table refresh_tokens {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
   token_hash varchar(128) [unique, not null]
   family_id uuid [not null]
-  replaced_by_token_id bigint
+  replaced_by_token_id bigint [ref: > refresh_tokens.id]
   reused_at timestamptz
   expires_at timestamptz [not null]
-  revoked boolean [not null]
+  revoked boolean [not null, default: false]
   created_at timestamptz [not null]
 }
 
-Table Profile {
-  user_id bigint [pk, ref: - User.id]
+Table magic_login_tokens {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  token_hash varchar(128) [unique, not null]
+  expires_at timestamptz [not null]
+  used boolean [not null, default: false]
+  used_at timestamptz
+  created_at timestamptz [not null]
+}
+
+Table consent_logs {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  document_type varchar(40) [not null]
+  version varchar(20) [not null]
+  accepted_at timestamptz [not null]
+  ip_hash varchar(128)
+  user_agent_hash varchar(128)
+}
+
+Table profiles {
+  user_id bigint [pk, ref: - users.id]
   first_name varchar(80) [not null]
   last_name varchar(80) [not null]
   phone varchar(30)
   bio varchar(500)
-  city_id bigint [ref: > City.id]
-  zone_id bigint [ref: > Zone.id]
-  community_org_status varchar(30) [not null, note: 'NONE|ELIGIBLE|ACTIVE|REVOKED']
-  completed_walks_count int [not null]
+  photo_key varchar(255)
+  city_id bigint [ref: > cities.id]
+  zone_id bigint [ref: > zones.id]
+  community_org_status varchar(30) [not null, default: 'NONE', note: 'NONE|ELIGIBLE|ACTIVE|REVOKED']
+  completed_walks_count int [not null, default: 0]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table CommunityOrgStatusHistory {
+Table community_org_status_history {
   id bigint [pk, increment]
-  user_id bigint [not null, ref: > User.id]
+  user_id bigint [not null, ref: > users.id]
   from_status varchar(30)
-  to_status varchar(30) [not null]
-  changed_by bigint [ref: > User.id]
+  to_status varchar(30) [not null, note: 'NONE|ELIGIBLE|ACTIVE|REVOKED']
+  changed_by bigint [ref: > users.id]
   reason text
-  automatic boolean [not null]
+  automatic boolean [not null, default: false]
   created_at timestamptz [not null]
 }
 
-Table Dog {
+// ---------------------------------------------------------------------------
+// Chiens
+// ---------------------------------------------------------------------------
+
+Table dogs {
   id bigint [pk, increment]
   public_id uuid [unique, not null]
-  owner_id bigint [not null, ref: > User.id]
+  owner_id bigint [not null, ref: > users.id]
   name varchar(100) [not null]
   breed varchar(100) [not null]
+  birth_date date
   sex varchar(10) [not null]
-  size_category varchar(20) [not null]
-  energy_level varchar(20) [not null]
+  sterilized boolean [not null, default: false]
+  weight_kg decimal(5,2)
+  size_category varchar(20) [not null, note: 'SMALL|MEDIUM|LARGE']
+  identification_number varchar(50)
+  photo_key varchar(255)
+  energy_level varchar(20) [not null, note: 'LOW|MEDIUM|HIGH']
   sociability_dogs varchar(20) [not null]
   sociability_humans varchar(20) [not null]
+  recall_level varchar(20)
+  leash_pulling varchar(20)
+  attention_notes text
   danger_category varchar(5)
-  dossier_status varchar(30) [not null]
-  validated_by bigint [ref: > User.id]
+  dossier_status varchar(30) [not null, default: 'DRAFT']
+  validated_by bigint [ref: > users.id]
   validated_at timestamptz
   refusal_reason text
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table DogDocument {
+Table dog_documents {
   id bigint [pk, increment]
-  dog_id bigint [not null, ref: > Dog.id]
-  doc_type varchar(40) [not null]
-  storage_key varchar(255) [not null]
+  dog_id bigint [not null, ref: > dogs.id]
+  doc_type varchar(40) [not null, note: 'VACCINATION|INSURANCE|IDENTIFICATION|OTHER']
+  storage_key varchar(255) [not null, note: 'len>=16']
   expires_at date
-  status varchar(30) [not null]
-  validated_by bigint [ref: > User.id]
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING|VALIDATED|REFUSED|EXPIRED']
+  uploaded_at timestamptz [not null]
+  validated_by bigint [ref: > users.id]
   validated_at timestamptz
   refusal_reason text
   reminder_j30_sent_at timestamptz
@@ -120,297 +181,412 @@ Table DogDocument {
   updated_at timestamptz [not null]
 }
 
-Table MembershipPlan {
+// ---------------------------------------------------------------------------
+// Adhésion
+// ---------------------------------------------------------------------------
+
+Table membership_plans {
   id bigint [pk, increment]
   code varchar(40) [unique, not null]
   name varchar(120) [not null]
+  description text
   price_cents int [not null]
-  interval_unit varchar(20) [not null]
-  active boolean [not null]
+  currency varchar(3) [not null, default: 'EUR']
+  interval_unit varchar(20) [not null, note: 'MONTH|YEAR|ONE_TIME']
+  stripe_price_id varchar(120)
+  active boolean [not null, default: true]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table Membership {
+Table memberships {
   id bigint [pk, increment]
-  user_id bigint [not null, ref: > User.id]
-  plan_id bigint [not null, ref: > MembershipPlan.id]
-  status varchar(30) [not null]
+  user_id bigint [not null, ref: > users.id]
+  plan_id bigint [not null, ref: > membership_plans.id]
+  status varchar(30) [not null, note: 'ACTIVE|CANCELLED|PAST_DUE|INCOMPLETE|EXPIRED']
   current_period_start timestamptz
   current_period_end timestamptz
+  stripe_subscription_id varchar(120)
+  stripe_customer_id varchar(120)
+  cancel_at_period_end boolean [not null, default: false]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table WalkerProfile {
+// ---------------------------------------------------------------------------
+// Promeneurs
+// ---------------------------------------------------------------------------
+
+Table walker_profiles {
   id bigint [pk, increment]
-  user_id bigint [unique, not null, ref: > User.id]
-  walker_type varchar(20) [not null]
-  status varchar(30) [not null]
+  user_id bigint [unique, not null, ref: > users.id]
+  walker_type varchar(20) [not null, note: 'STAFF|INDEP']
   siret varchar(14)
+  diploma_key varchar(255)
+  rc_pro_key varchar(255)
+  rc_pro_expires_at date
   stripe_connect_account varchar(120)
+  charter_signed_at timestamptz
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING|VALIDATED|REFUSED|SUSPENDED']
+  bio varchar(500)
   average_rating decimal(3,2)
-  ratings_count int [not null]
+  ratings_count int [not null, default: 0]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table WalkerDocument {
+Table walker_documents {
   id bigint [pk, increment]
-  walker_id bigint [not null, ref: > WalkerProfile.id]
-  doc_type varchar(40) [not null]
-  storage_key varchar(255) [not null]
+  walker_id bigint [not null, ref: > walker_profiles.id]
+  doc_type varchar(40) [not null, note: 'DIPLOMA|SIRET|RC_PRO|CHARTER|OTHER']
+  storage_key varchar(255) [not null, note: 'len>=16']
   expires_at date
-  status varchar(30) [not null]
-  validated_by bigint [ref: > User.id]
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING|VALIDATED|REFUSED|EXPIRED']
+  validated_by bigint [ref: > users.id]
   validated_at timestamptz
+  refusal_reason text
   reminder_j30_sent_at timestamptz
   reminder_j7_sent_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'UNIQUE partiel (walker_id, doc_type) WHERE status IN (PENDING, VALIDATED)'
 }
 
-Table MeetingPoint {
+// ---------------------------------------------------------------------------
+// Balades
+// ---------------------------------------------------------------------------
+
+Table meeting_points {
   id bigint [pk, increment]
   public_id uuid [unique, not null]
-  city_id bigint [not null, ref: > City.id]
+  city_id bigint [not null, ref: > cities.id]
   name varchar(120) [not null]
   address varchar(255) [not null]
   lat double [not null]
   lng double [not null]
-  active boolean [not null]
+  active boolean [not null, default: true]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table Walk {
+Table walks {
   id bigint [pk, increment]
   public_id uuid [unique, not null]
-  city_id bigint [not null, ref: > City.id]
-  meeting_point_id bigint [not null, ref: > MeetingPoint.id]
+  city_id bigint [not null, ref: > cities.id]
+  meeting_point_id bigint [not null, ref: > meeting_points.id]
   walk_type varchar(30) [not null, note: 'STAFF_GUIDED|COMMUNITY']
   title varchar(160) [not null]
+  description text
   starts_at timestamptz [not null]
   duration_minutes int [not null]
   capacity int [not null]
-  price_cents int [not null]
+  price_cents int [not null, default: 0]
   non_member_price_cents int
-  walker_id bigint [ref: > WalkerProfile.id]
-  organizer_user_id bigint [ref: > User.id]
-  status varchar(30) [not null]
-  accepted_sizes text[] [not null]
-  accepted_energy text[] [not null]
-  cancelled_by_user_id bigint [ref: > User.id]
+  walker_id bigint [ref: > walker_profiles.id]
+  organizer_user_id bigint [ref: > users.id]
+  status varchar(30) [not null, default: 'PUBLISHED', note: 'DRAFT|PUBLISHED|CANCELLED|COMPLETED']
+  accepted_sizes text[] [not null, note: 'SMALL|MEDIUM|LARGE']
+  accepted_energy text[] [not null, note: 'LOW|MEDIUM|HIGH']
+  min_sociability_dogs varchar(20)
+  route_hint text
+  cancelled_by_user_id bigint [ref: > users.id]
   cancellation_reason text
-  recurrence_rule_id bigint
+  recurrence_rule_id bigint [ref: > walk_recurrence_rules.id]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'COMMUNITY => capacity<=8 + organizer; STAFF_GUIDED => walker requis'
 }
 
-Table WalkRecurrenceRule {
+Table walk_recurrence_rules {
   id bigint [pk, increment]
-  template_walk_id bigint [not null, ref: > Walk.id]
+  template_walk_id bigint [not null, ref: > walks.id]
   cron_expression varchar(80) [not null]
   until_date date
-  active boolean [not null]
+  active boolean [not null, default: true]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table Booking {
+// ---------------------------------------------------------------------------
+// Réservations & présence
+// ---------------------------------------------------------------------------
+
+Table bookings {
   id bigint [pk, increment]
   public_id uuid [unique, not null]
-  walk_id bigint [not null, ref: > Walk.id]
-  user_id bigint [not null, ref: > User.id]
-  dog_id bigint [not null, ref: > Dog.id]
-  status varchar(30) [not null, note: '…|CANCELLED_FREE|CANCELLED_LATE']
-  payment_required boolean [not null]
-  price_cents int [not null]
-  is_trial boolean [not null]
+  walk_id bigint [not null, ref: > walks.id]
+  user_id bigint [not null, ref: > users.id]
+  dog_id bigint [not null, ref: > dogs.id]
+  status varchar(30) [not null, note: 'PENDING_PAYMENT|CONFIRMED|CANCELLED_FREE|CANCELLED_LATE|COMPLETED|NO_SHOW|WAITLISTED']
+  payment_required boolean [not null, default: false]
+  price_cents int [not null, default: 0]
+  community_ack boolean [not null, default: false]
+  is_trial boolean [not null, default: false]
+  stripe_session_id varchar(120)
   payment_expires_at timestamptz
-  cancelled_by_user_id bigint [ref: > User.id]
-  cancelled_by_role varchar(40)
+  cancelled_by_user_id bigint [ref: > users.id]
+  cancelled_by_role varchar(40) [note: 'USER|ORGANIZER|WALKER|ADMIN|SYSTEM']
   cancellation_reason text
-  counts_toward_org_threshold boolean [not null]
-  counts_toward_membership_quota boolean [not null]
+  counts_toward_org_threshold boolean [not null, default: false]
+  counts_toward_membership_quota boolean [not null, default: false]
   confirmed_at timestamptz
   cancelled_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'UNIQUE partiel (walk_id, dog_id) hors CANCELLED_*; 1 trial / user; R4 late => les deux counts TRUE'
 }
 
-Table WaitlistEntry {
+Table waitlist_entries {
   id bigint [pk, increment]
-  walk_id bigint [not null, ref: > Walk.id]
-  user_id bigint [not null, ref: > User.id]
-  dog_id bigint [not null, ref: > Dog.id]
+  walk_id bigint [not null, ref: > walks.id]
+  user_id bigint [not null, ref: > users.id]
+  dog_id bigint [not null, ref: > dogs.id]
   position int [not null]
-  status varchar(30) [not null]
+  status varchar(30) [not null, default: 'WAITING', note: 'WAITING|OFFERED|ACCEPTED|EXPIRED|CANCELLED']
   offered_at timestamptz
   offer_expires_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'UNIQUE partiel (walk_id, dog_id) WHERE WAITING|OFFERED'
 }
 
-Table Attendance {
+Table attendance {
   id bigint [pk, increment]
-  booking_id bigint [unique, not null, ref: - Booking.id]
-  departure_status varchar(20)
-  return_status varchar(20)
-  recorded_by bigint [ref: > User.id]
+  booking_id bigint [unique, not null, ref: - bookings.id]
+  departure_status varchar(20) [note: 'PRESENT|ABSENT|LATE']
+  departure_at timestamptz
+  return_status varchar(20) [note: 'PRESENT|ABSENT|EARLY']
+  return_at timestamptz
+  recorded_by bigint [ref: > users.id]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table WalkReport {
+Table walk_reports {
   id bigint [pk, increment]
-  walk_id bigint [unique, not null, ref: - Walk.id]
-  author_id bigint [not null, ref: > User.id]
+  walk_id bigint [unique, not null, ref: - walks.id]
+  author_id bigint [not null, ref: > users.id]
   actual_duration_minutes int
   route_done text
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table Incident {
+Table walk_report_dog_notes {
   id bigint [pk, increment]
-  walk_id bigint [not null, ref: > Walk.id]
-  walk_report_id bigint [ref: > WalkReport.id]
-  reported_by bigint [not null, ref: > User.id]
-  incident_type varchar(40) [not null]
-  severity varchar(20) [not null]
+  report_id bigint [not null, ref: > walk_reports.id]
+  dog_id bigint [not null, ref: > dogs.id]
+  behavior_score int
+  comment text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'UNIQUE(report_id, dog_id)'
+}
+
+Table incidents {
+  id bigint [pk, increment]
+  walk_id bigint [not null, ref: > walks.id]
+  walk_report_id bigint [ref: > walk_reports.id]
+  reported_by bigint [not null, ref: > users.id]
+  incident_type varchar(40) [not null, note: 'BITE|FIGHT|INJURY|LOST_DOG|BEHAVIOR|OTHER']
+  severity varchar(20) [not null, note: 'LOW|MEDIUM|HIGH|CRITICAL']
   description text [not null]
-  status varchar(30) [not null]
-  handled_by bigint [ref: > User.id]
+  status varchar(30) [not null, default: 'OPEN', note: 'OPEN|IN_PROGRESS|RESOLVED|DISMISSED']
+  handled_by bigint [ref: > users.id]
   handled_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table Review {
-  id bigint [pk, increment]
-  walk_id bigint [not null, ref: > Walk.id]
-  author_id bigint [not null, ref: > User.id]
-  target_user_id bigint [not null, ref: > User.id]
-  rating int [not null]
-  review_type varchar(40) [not null]
-  moderation_status varchar(20) [not null]
-  comment text
-  reply text
-  replied_at timestamptz
-  created_at timestamptz [not null]
-  updated_at timestamptz [not null]
-}
+// ---------------------------------------------------------------------------
+// Social / modération
+// ---------------------------------------------------------------------------
 
-Table Conversation {
+Table conversations {
   id bigint [pk, increment]
   public_id uuid [unique, not null]
-  conversation_type varchar(40) [not null]
-  walk_id bigint [ref: > Walk.id]
+  conversation_type varchar(40) [not null, note: 'WALK|SUPPORT|DIRECT|MODERATION']
+  walk_id bigint [ref: > walks.id]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+  archived_at timestamptz
 }
 
-Table ConversationMember {
-  conversation_id bigint [not null, ref: > Conversation.id]
-  user_id bigint [not null, ref: > User.id]
+Table conversation_members {
+  conversation_id bigint [not null, ref: > conversations.id]
+  user_id bigint [not null, ref: > users.id]
   last_read_at timestamptz
   last_notified_at timestamptz
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
-  indexes { (conversation_id, user_id) [pk] }
+
+  indexes {
+    (conversation_id, user_id) [pk]
+  }
 }
 
-Table Message {
+Table messages {
   id bigint [pk, increment]
-  conversation_id bigint [not null, ref: > Conversation.id]
-  sender_id bigint [not null, ref: > User.id]
+  conversation_id bigint [not null, ref: > conversations.id]
+  sender_id bigint [not null, ref: > users.id]
   body text
+  photo_key varchar(255)
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
   read_at timestamptz
 }
 
-Table Report {
+Table user_blocks {
+  blocker_id bigint [not null, ref: > users.id]
+  blocked_id bigint [not null, ref: > users.id]
+  created_at timestamptz [not null]
+
+  indexes {
+    (blocker_id, blocked_id) [pk]
+  }
+
+  Note: 'CHECK blocker_id <> blocked_id'
+}
+
+Table reviews {
   id bigint [pk, increment]
-  reporter_id bigint [not null, ref: > User.id]
+  walk_id bigint [not null, ref: > walks.id]
+  author_id bigint [not null, ref: > users.id]
+  target_user_id bigint [not null, ref: > users.id]
+  rating int [not null, note: '1..5']
+  comment text
+  reply text
+  review_type varchar(40) [not null, default: 'WALK_TOGETHER', note: 'WALKER_OR_ORGANIZER|WALK_TOGETHER']
+  moderation_status varchar(20) [not null, default: 'VISIBLE', note: 'VISIBLE|HIDDEN']
+  replied_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'UNIQUE(walk_id, author_id, target_user_id); fenêtre 14j via trigger'
+}
+
+Table reports {
+  id bigint [pk, increment]
+  reporter_id bigint [not null, ref: > users.id]
   target_type varchar(40) [not null]
   target_id bigint [not null]
   reason text [not null]
-  status varchar(30) [not null]
-  conversation_id bigint [ref: > Conversation.id]
-  decided_by bigint [ref: > User.id]
+  status varchar(30) [not null, default: 'OPEN', note: 'OPEN|IN_REVIEW|RESOLVED|DISMISSED']
+  decision varchar(40)
+  decided_by bigint [ref: > users.id]
+  decided_at timestamptz
+  conversation_id bigint [ref: > conversations.id]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table Payment {
+// ---------------------------------------------------------------------------
+// Paiements
+// ---------------------------------------------------------------------------
+
+Table payments {
   id bigint [pk, increment]
-  user_id bigint [not null, ref: > User.id]
-  booking_id bigint [ref: > Booking.id]
-  membership_id bigint [ref: > Membership.id]
+  user_id bigint [not null, ref: > users.id]
+  booking_id bigint [ref: > bookings.id]
+  membership_id bigint [ref: > memberships.id]
   amount_cents int [not null]
-  commission_cents int [not null]
-  payment_type varchar(40) [not null]
-  status varchar(30) [not null]
+  currency varchar(3) [not null, default: 'EUR']
+  payment_type varchar(40) [not null, note: 'BOOKING|MEMBERSHIP|TIP|OTHER']
+  status varchar(30) [not null, note: 'PENDING|SUCCEEDED|FAILED|REFUNDED|PARTIAL_REFUND']
+  stripe_payment_intent varchar(120)
+  commission_cents int [not null, default: 0]
   refund_amount_cents int
   refund_provider_id varchar(120)
   refunded_at timestamptz
   refund_reason text
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'cœur immutable (trigger); corrections via refund_*'
 }
 
-Table Payout {
+Table payouts {
   id bigint [pk, increment]
-  walker_id bigint [not null, ref: > WalkerProfile.id]
-  payment_id bigint [not null, ref: > Payment.id]
+  walker_id bigint [not null, ref: > walker_profiles.id]
+  payment_id bigint [not null, ref: > payments.id]
   amount_cents int [not null]
-  status varchar(30) [not null]
+  status varchar(30) [not null, note: 'PENDING|PAID|FAILED|CANCELLED']
+  stripe_transfer_id varchar(120)
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+
+  Note: 'DELETE interdit (trigger)'
 }
 
-Table WebhookEvent {
+Table webhook_events {
   id bigint [pk, increment]
   provider varchar(40) [not null]
   event_id varchar(120) [not null]
-  signature_valid boolean [not null]
+  signature_valid boolean [not null, default: false]
   payload_hash varchar(128)
-  processing_status varchar(30) [not null]
+  processing_status varchar(30) [not null, default: 'PROCESSED', note: 'RECEIVED|PROCESSED|FAILED|IGNORED']
   processed_at timestamptz [not null]
   created_at timestamptz [not null]
+
+  Note: 'UNIQUE(provider, event_id)'
 }
 
-Table EmailTemplate {
+// ---------------------------------------------------------------------------
+// Contenu, config, audit
+// ---------------------------------------------------------------------------
+
+Table email_templates {
   id bigint [pk, increment]
   code varchar(80) [unique, not null]
   name varchar(160) [not null]
   subject varchar(255) [not null]
   body_html text [not null]
-  active boolean [not null]
+  body_text text
+  active boolean [not null, default: true]
+  version varchar(20) [not null, default: '1']
+  updated_by bigint [ref: > users.id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table settings {
+  key varchar(80) [pk]
+  value text [not null]
+  description text
+  updated_at timestamptz [not null]
+
+  Note: 'bornes métier via trigger barkwalk_settings_bounds'
+}
+
+Table content_pages {
+  id bigint [pk, increment]
+  slug varchar(80) [unique, not null]
+  title varchar(160) [not null]
+  body text [not null]
   version varchar(20) [not null]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
 
-Table AuditLog {
+Table audit_log {
   id bigint [pk, increment]
-  actor_id bigint [ref: > User.id]
+  actor_id bigint [ref: > users.id]
   action varchar(80) [not null]
   entity_type varchar(60)
   entity_id bigint
+  details text
   before_state jsonb
   after_state jsonb
   correlation_id uuid
-  details text
   created_at timestamptz [not null]
-  Note: 'append-only'
+
+  Note: 'append-only (trigger + REVOKE UPDATE/DELETE rôle barkwalk_app)'
 }
 
-Table Setting {
-  key varchar(80) [pk]
-  value text [not null]
-  description text
-  updated_at timestamptz [not null]
-}
+// Rôles PG (ops, hors tables) : barkwalk_app | barkwalk_migrator | barkwalk_readonly
+// Vue RGPD : v_user_personal_data_export

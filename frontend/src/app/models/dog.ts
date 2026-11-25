@@ -1,3 +1,4 @@
+// Types TypeScript alignés sur l'API chiens.
 export interface Dog {
   id: number;
   name: string;

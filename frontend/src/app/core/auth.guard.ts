@@ -1,3 +1,4 @@
+// Bloque l'accès aux pages privées si l'utilisateur n'est pas connecté.
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';

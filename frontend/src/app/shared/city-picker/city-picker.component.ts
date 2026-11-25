@@ -1,3 +1,4 @@
+// Champ de recherche ville / code postal avec suggestions.
 import { Component, Output, EventEmitter, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
 import { Subscription } from 'rxjs';

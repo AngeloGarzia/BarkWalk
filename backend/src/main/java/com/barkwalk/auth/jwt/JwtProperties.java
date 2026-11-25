@@ -2,6 +2,7 @@ package com.barkwalk.auth.jwt;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+// Paramètres JWT (secret, durées) issus de la configuration.
 @ConfigurationProperties(prefix = "barkwalk.jwt")
 public class JwtProperties {
     private String secret;

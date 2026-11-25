@@ -3,6 +3,7 @@ package com.barkwalk.common;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+// Écriture seule dans le journal d'audit (pas de mise à jour ni suppression).
 @Service
 public class AuditService {
     private final AuditLogRepository repository;

@@ -26,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+// Inscription, connexion, refresh et déconnexion. Les jetons bruts ne sont jamais persistés, seulement
+// leur empreinte.
 @Service
 public class AuthService {
     private final UserRepository userRepository;
@@ -50,6 +52,7 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
+    // Crée le compte et le profil associé. L'e-mail est normalisé avant stockage.
     @Transactional
     public TokenResponse register(RegisterRequest request) {
         if (!request.acceptCgu()) {
@@ -85,6 +88,7 @@ public class AuthService {
         return issueTokens(user);
     }
 
+    // Rotation simple : l'ancien refresh est révoqué, un nouveau est émis.
     @Transactional
     public TokenResponse refresh(String refreshTokenRaw) {
         String hash = sha256(refreshTokenRaw);
@@ -110,6 +114,7 @@ public class AuthService {
         userRepository.findByEmailIgnoreCase(email).orElse(null);
     }
 
+    // Seule l'empreinte SHA-256 du refresh est enregistrée ; le client reçoit la valeur brute une fois.
     private TokenResponse issueTokens(User user) {
         String access = jwtService.createAccessToken(user.getId(), user.getEmail(), user.getRoles());
         String refreshRaw = UUID.randomUUID() + "." + UUID.randomUUID();

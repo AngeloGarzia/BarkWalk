@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+// Liste et création de chiens — race préremplie via Dog API (dogapi.dog).
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Dog } from '../../models/dog';
+import { BreedService } from '../../services/breed.service';
 
 @Component({
   selector: 'app-dogs',
@@ -22,8 +24,31 @@ import { Dog } from '../../models/dog';
         <h2>Ajouter un chien</h2>
         <form [formGroup]="form" (ngSubmit)="create()" class="form">
           <div class="form-row">
-            <label>Nom <input formControlName="name" type="text" /></label>
-            <label>Race <input formControlName="breed" type="text" /></label>
+            <label>
+              Nom
+              <input formControlName="name" type="text" autocomplete="off" />
+            </label>
+            <label>
+              Race
+              <input
+                formControlName="breed"
+                type="text"
+                list="breed-options"
+                placeholder="Rechercher une race…"
+                autocomplete="off"
+                (input)="onBreedInput($event)"
+              />
+              <datalist id="breed-options">
+                @for (breed of filteredBreeds(); track breed) {
+                  <option [value]="breed"></option>
+                }
+              </datalist>
+              @if (breedsLoading()) {
+                <span class="field-hint">Chargement des races…</span>
+              } @else if (breeds().length > 0) {
+                <span class="field-hint">{{ breeds().length }} races (Dog API)</span>
+              }
+            </label>
           </div>
           <div class="form-row">
             <label>
@@ -100,34 +125,156 @@ import { Dog } from '../../models/dog';
   `,
   styles: [
     `
-      .dogs-page { max-width: 760px; margin: 0 auto; padding: 1.5rem 1rem; }
-      h1 { font-family: var(--font-display); margin: 0 0 0.25rem; }
-      .subtitle { color: var(--muted); margin: 0 0 1.5rem; }
-      .panel { background: #fff; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; border: 1px solid var(--line); }
-      .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-      label { display: grid; gap: 0.35rem; margin-bottom: 0.75rem; font-size: 0.9rem; }
-      label.check { display: flex; align-items: center; gap: 0.5rem; }
-      input, select { padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
-      button { border: 0; border-radius: 8px; padding: 0.65rem 1rem; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-      .btn-ghost { background: transparent; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
-      .btn-danger { background: transparent; color: #9b2c2c; border: 1px solid #f0c2c2; }
-      .panel-head { display: flex; justify-content: space-between; align-items: center; }
-      .dog-list { list-style: none; margin: 0; padding: 0; }
-      .dog-list li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.85rem 0; border-bottom: 1px solid var(--line); }
-      .dog-list li > div { display: grid; gap: 0.2rem; }
-      .actions { display: flex; gap: 0.5rem; align-items: center; }
-      .muted { color: var(--muted); }
-      .banner.error { background: #fde8e8; color: #9b2c2c; padding: 0.75rem 1rem; border-radius: 8px; }
+      .dogs-page {
+        max-width: 28rem;
+        margin: 0 auto;
+        padding: 1.1rem 1rem 1.5rem;
+      }
+      h1 {
+        font-family: var(--font-display);
+        margin: 0 0 0.25rem;
+        color: var(--forest-deep);
+      }
+      .subtitle {
+        color: var(--muted);
+        margin: 0 0 1.25rem;
+        font-size: 0.92rem;
+      }
+      .panel {
+        background: var(--surface);
+        border-radius: var(--radius-md);
+        padding: 1.15rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-sm);
+      }
+      .panel h2 {
+        margin: 0 0 0.85rem;
+        font-size: 1.05rem;
+        color: var(--forest-deep);
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      label {
+        display: grid;
+        gap: 0.35rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      label.check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+      }
+      input,
+      select {
+        padding: 0.55rem 0.7rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        font: inherit;
+        background: var(--bg);
+      }
+      .field-hint {
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      button {
+        border: 0;
+        border-radius: var(--radius-pill);
+        padding: 0.7rem 1.1rem;
+        background: var(--cta);
+        color: var(--on-cta);
+        font-weight: 700;
+        font-family: var(--font-display);
+        cursor: pointer;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--forest);
+        border: 1px solid var(--forest-soft);
+      }
+      .btn-danger {
+        background: transparent;
+        color: var(--danger);
+        border: 1px solid #e8b4b0;
+      }
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      .panel-head h2 {
+        margin: 0;
+      }
+      .dog-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .dog-list li {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.85rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .dog-list li > div {
+        display: grid;
+        gap: 0.2rem;
+      }
+      .dog-list span {
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .banner.error {
+        background: #fde8e8;
+        color: var(--danger);
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-sm);
+      }
+      @media (max-width: 480px) {
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+      }
     `,
   ],
 })
 export class DogsComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly fb = inject(FormBuilder);
+  private readonly breedsApi = inject(BreedService);
 
   protected readonly dogs = signal<Dog[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(false);
+  protected readonly breeds = signal<string[]>([]);
+  protected readonly breedsLoading = signal(true);
+  protected readonly breedQuery = signal('');
+
+  protected readonly filteredBreeds = computed(() => {
+    const q = this.breedQuery().trim().toLowerCase();
+    const all = this.breeds();
+    if (!q) {
+      return all.slice(0, 80);
+    }
+    return all.filter((b) => b.toLowerCase().includes(q)).slice(0, 80);
+  });
 
   protected readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
@@ -142,6 +289,17 @@ export class DogsComponent implements OnInit {
 
   ngOnInit(): void {
     this.reload();
+    this.breedsApi.listBreeds().subscribe({
+      next: (list) => {
+        this.breeds.set(list);
+        this.breedsLoading.set(false);
+      },
+      error: () => this.breedsLoading.set(false),
+    });
+  }
+
+  protected onBreedInput(event: Event): void {
+    this.breedQuery.set((event.target as HTMLInputElement).value);
   }
 
   protected reload(): void {
@@ -176,6 +334,7 @@ export class DogsComponent implements OnInit {
           sociabilityDogs: 'GOOD',
           sociabilityHumans: 'GOOD',
         });
+        this.breedQuery.set('');
         this.reload();
       },
       error: () => this.error.set('Création impossible.'),

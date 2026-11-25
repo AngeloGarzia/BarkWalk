@@ -1,299 +1,163 @@
-import { Component, inject, signal } from '@angular/core';
+// Coquille app : contenu + navigation bas style POC (Accueil / Balades / Messages / Chiens / Profil).
+import { Component, inject } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
-import { CityPickerComponent } from '../shared/city-picker/city-picker.component';
 import { AuthService } from '../core/auth.service';
-import { City } from '../shared/city.service';
-import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CityPickerComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="shell">
-      <!-- Header -->
-      <header class="site-header">
-        <div class="header-inner">
-          <a routerLink="/" class="brand">
-            <span class="brand-logo">🐾</span>
-            <span class="brand-name">BarkWalk</span>
-          </a>
-
-          <div class="header-city">
-            <app-city-picker (citySelected)="onCitySelected($event)" />
-          </div>
-
-          <nav class="main-nav" role="navigation" aria-label="Navigation principale">
-            <a routerLink="/catalog" routerLinkActive="active">Promenades</a>
-            @if (auth.loggedIn()) {
-              <a routerLink="/dogs" routerLinkActive="active">Mes chiens</a>
-              <a routerLink="/profile" routerLinkActive="active">Profil</a>
-              <button class="nav-logout" (click)="logout()">Déconnexion</button>
-            } @else {
-              <a routerLink="/login" routerLinkActive="active">Connexion</a>
-              <a routerLink="/register" routerLinkActive="active" class="nav-cta">Inscription</a>
-            }
-          </nav>
-
-          <!-- Mobile menu toggle -->
-          <button
-            class="menu-toggle"
-            (click)="menuOpen.set(!menuOpen())"
-            [attr.aria-expanded]="menuOpen()"
-            aria-label="Menu"
-          >
-            <span></span><span></span><span></span>
-          </button>
-        </div>
-
-        <!-- Mobile nav -->
-        @if (menuOpen()) {
-          <nav class="mobile-nav" role="navigation" aria-label="Navigation mobile">
-            <a routerLink="/catalog" routerLinkActive="active" (click)="menuOpen.set(false)">
-              🗺️ Promenades
-            </a>
-            @if (auth.loggedIn()) {
-              <a routerLink="/dogs" routerLinkActive="active" (click)="menuOpen.set(false)">
-                🐕 Mes chiens
-              </a>
-              <a routerLink="/profile" routerLinkActive="active" (click)="menuOpen.set(false)">
-                👤 Profil
-              </a>
-              <a routerLink="/walker/today" routerLinkActive="active" (click)="menuOpen.set(false)">
-                📅 Promenades du jour
-              </a>
-              <a routerLink="/admin" routerLinkActive="active" (click)="menuOpen.set(false)">
-                ⚙️ Admin
-              </a>
-              <button class="mobile-logout" (click)="logout()">Déconnexion</button>
-            } @else {
-              <a routerLink="/login" routerLinkActive="active" (click)="menuOpen.set(false)">
-                Connexion
-              </a>
-              <a routerLink="/register" routerLinkActive="active" (click)="menuOpen.set(false)">
-                Inscription
-              </a>
-            }
-          </nav>
-        }
-      </header>
-
-      <!-- City chip -->
-      @if (selectedCity()) {
-        <div class="city-banner">
-          <span>📍 {{ selectedCity()?.name }} ({{ selectedCity()?.postalCode }})</span>
-          <button (click)="clearCity()" aria-label="Changer de ville">✕</button>
-        </div>
-      }
-
-      <!-- Main content -->
       <main class="main-content">
         <router-outlet />
       </main>
 
-      <!-- Footer -->
-      <footer class="site-footer">
-        <p>&copy; 2026 BarkWalk · Promenades canines de confiance</p>
-      </footer>
+      <nav class="bottom-nav" role="navigation" aria-label="Navigation principale">
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="tab">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>Accueil</span>
+        </a>
+
+        <a routerLink="/catalog" routerLinkActive="active" class="tab">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path d="M8 3v4M16 3v4M4 10h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+          <span>Balades</span>
+        </a>
+
+        <a
+          [routerLink]="auth.loggedIn() ? '/messaging' : '/login'"
+          routerLinkActive="active"
+          class="tab"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M5 6h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span>Messages</span>
+        </a>
+
+        <a
+          [routerLink]="auth.loggedIn() ? '/dogs' : '/login'"
+          routerLinkActive="active"
+          class="tab"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="7.5" cy="8" r="1.6" fill="currentColor" />
+            <circle cx="16.5" cy="8" r="1.6" fill="currentColor" />
+            <circle cx="5" cy="12.5" r="1.5" fill="currentColor" />
+            <circle cx="19" cy="12.5" r="1.5" fill="currentColor" />
+            <ellipse cx="12" cy="15.5" rx="3.2" ry="2.6" fill="currentColor" />
+          </svg>
+          <span>Mes chiens</span>
+        </a>
+
+        <a
+          [routerLink]="auth.loggedIn() ? '/profile' : '/login'"
+          routerLinkActive="active"
+          class="tab"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="9" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path
+              d="M5.5 19.5c1.6-3 4-4.5 6.5-4.5s4.9 1.5 6.5 4.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span>Profil</span>
+        </a>
+      </nav>
     </div>
   `,
   styles: [
     `
       .shell {
-        min-height: 100vh;
+        min-height: 100dvh;
         display: flex;
         flex-direction: column;
-      }
-
-      /* ── Header ── */
-      .site-header {
-        background: white;
-        border-bottom: 1px solid var(--line);
-        position: sticky;
-        top: 0;
-        z-index: 50;
-      }
-      .header-inner {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 0.75rem 1.25rem;
-        max-width: 1200px;
-        margin: 0 auto;
-        width: 100%;
-      }
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        text-decoration: none;
-        flex-shrink: 0;
-      }
-      .brand-logo {
-        font-size: 1.3rem;
-      }
-      .brand-name {
-        font-family: var(--font-display);
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: var(--accent);
-        letter-spacing: -0.01em;
-      }
-      .header-city {
-        flex: 1;
-        max-width: 280px;
-        margin-left: auto;
-      }
-      .main-nav {
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        flex-shrink: 0;
-      }
-      .main-nav a {
-        padding: 0.4rem 0.75rem;
-        border-radius: 6px;
-        text-decoration: none;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--muted);
-        transition: color 0.15s, background 0.15s;
-      }
-      .main-nav a:hover,
-      .main-nav a.active {
-        color: var(--accent);
-        background: rgba(47, 107, 79, 0.06);
-      }
-      .nav-cta {
-        background: var(--accent) !important;
-        color: white !important;
-        margin-left: 0.25rem;
-      }
-      .nav-cta:hover {
-        opacity: 0.88;
-      }
-      .nav-logout {
-        background: transparent;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 0.4rem 0.75rem;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: var(--muted);
-        cursor: pointer;
-        margin-left: 0.25rem;
-        transition: border-color 0.15s, color 0.15s;
-      }
-      .nav-logout:hover {
-        border-color: #e53e3e;
-        color: #e53e3e;
-      }
-
-      /* ── Mobile menu toggle ── */
-      .menu-toggle {
-        display: none;
-        flex-direction: column;
-        justify-content: center;
-        gap: 5px;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        padding: 4px;
-        margin-left: auto;
-      }
-      .menu-toggle span {
-        display: block;
-        width: 22px;
-        height: 2px;
-        background: var(--ink);
-        border-radius: 2px;
-      }
-
-      /* ── Mobile nav ── */
-      .mobile-nav {
-        display: flex;
-        flex-direction: column;
-        padding: 0.5rem 1.25rem 1rem;
-        border-top: 1px solid var(--line);
-        background: white;
-        gap: 0.25rem;
-      }
-      .mobile-nav a {
-        padding: 0.6rem 0.75rem;
-        border-radius: 8px;
-        text-decoration: none;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: var(--muted);
-        transition: background 0.15s;
-      }
-      .mobile-nav a:hover,
-      .mobile-nav a.active {
         background: var(--bg);
-        color: var(--accent);
-      }
-      .mobile-logout {
-        background: transparent;
-        border: 1px solid #e53e3e;
-        border-radius: 8px;
-        padding: 0.6rem 0.75rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #e53e3e;
-        cursor: pointer;
-        text-align: left;
-        margin-top: 0.25rem;
       }
 
-      /* ── City banner ── */
-      .city-banner {
-        background: rgba(47, 107, 79, 0.08);
-        border-bottom: 1px solid rgba(47, 107, 79, 0.15);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.75rem;
-        padding: 0.4rem 1rem;
-        font-size: 0.85rem;
-        color: var(--accent);
-        font-weight: 600;
-      }
-      .city-banner button {
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        color: var(--accent);
-        font-size: 0.9rem;
-        line-height: 1;
-        padding: 0 2px;
-      }
-
-      /* ── Main content ── */
       .main-content {
         flex: 1;
         min-height: 0;
+        padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
       }
 
-      /* ── Footer ── */
-      .site-footer {
+      .bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.15rem;
+        height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+        padding: 0.45rem 0.35rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
+        background: rgba(255, 255, 255, 0.96);
         border-top: 1px solid var(--line);
-        padding: 1.25rem;
-        text-align: center;
-        font-size: 0.85rem;
-        color: var(--muted);
-        background: white;
+        backdrop-filter: blur(10px);
+        max-width: 32rem;
+        margin: 0 auto;
+        box-shadow: 0 -6px 24px rgba(31, 61, 34, 0.06);
       }
 
-      /* ── Responsive ── */
-      @media (max-width: 680px) {
-        .main-nav {
-          display: none;
-        }
-        .header-city {
-          max-width: 160px;
-        }
-        .menu-toggle {
-          display: flex;
+      .tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        color: #8a9186;
+        text-decoration: none;
+        font-size: 0.68rem;
+        font-weight: 600;
+        border-radius: 12px;
+        transition:
+          color 0.15s ease,
+          background 0.15s ease;
+      }
+
+      .tab svg {
+        width: 1.35rem;
+        height: 1.35rem;
+      }
+
+      .tab.active {
+        color: var(--forest);
+      }
+
+      .tab:hover {
+        color: var(--forest-deep);
+        background: var(--forest-soft);
+      }
+
+      @media (min-width: 720px) {
+        .bottom-nav {
+          left: 50%;
+          right: auto;
+          transform: translateX(-50%);
+          width: min(32rem, 100%);
+          border-radius: 18px 18px 0 0;
         }
       }
     `,
@@ -301,22 +165,4 @@ import { Router } from '@angular/router';
 })
 export class ShellComponent {
   protected readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
-
-  protected readonly menuOpen = signal(false);
-  protected readonly selectedCity = signal<City | null>(null);
-
-  protected onCitySelected(city: City): void {
-    this.selectedCity.set(city);
-  }
-
-  protected clearCity(): void {
-    this.selectedCity.set(null);
-  }
-
-  protected logout(): void {
-    this.auth.logout();
-    this.menuOpen.set(false);
-    this.router.navigate(['/']);
-  }
 }

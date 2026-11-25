@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+// Principal sécurité rattaché à la requête (identifiant, e-mail, rôles).
 
 public class BarkWalkUserPrincipal implements UserDetails {
     private final Long id;

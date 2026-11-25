@@ -1,3 +1,4 @@
+// Parcours de réservation.
 import { Component } from '@angular/core';
 
 @Component({

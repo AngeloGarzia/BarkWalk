@@ -22,11 +22,13 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+// Chaîne de filtres Spring Security : JWT, CORS, routes publiques et protégées.
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    // BCrypt suffit pour la V1 ; la colonne password_algo permet d'évoluer vers Argon2id plus tard.
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

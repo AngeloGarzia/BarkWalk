@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// Traduit les erreurs métier et de validation en réponses HTTP homogènes.
 @RestControllerAdvice
 public class ApiExceptionHandler {
 

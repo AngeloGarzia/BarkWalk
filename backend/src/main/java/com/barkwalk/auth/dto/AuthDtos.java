@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.Set;
+// Contrats JSON d'entrée et de sortie pour l'authentification.
 
 public final class AuthDtos {
     private AuthDtos() {}

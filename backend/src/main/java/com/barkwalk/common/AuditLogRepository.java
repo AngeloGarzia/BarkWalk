@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
+// Composant du module common. Utilitaires transverses.
 
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
 }

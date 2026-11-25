@@ -1,3 +1,4 @@
+// État de session côté navigateur : jetons, rôles, login et logout.
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';

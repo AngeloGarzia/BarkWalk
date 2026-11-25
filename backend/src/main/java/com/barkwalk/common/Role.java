@@ -1,4 +1,5 @@
 package com.barkwalk.common;
+// Rôles applicatifs exposés dans user_roles.
 
 public enum Role {
     USER,

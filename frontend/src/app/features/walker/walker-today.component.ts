@@ -1,3 +1,4 @@
+// Agenda du jour pour l'encadrant.
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';

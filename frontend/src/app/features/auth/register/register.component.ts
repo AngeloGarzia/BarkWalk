@@ -1,3 +1,4 @@
+// Inscription d'un nouveau compte.
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -62,17 +63,19 @@ import { AuthService } from '../../../core/auth.service';
         padding: 1rem;
       }
       .auth-card {
-        background: white;
-        border-radius: 12px;
-        padding: 2rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 1.75rem 1.5rem;
         width: 100%;
         max-width: 460px;
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+        box-shadow: var(--shadow-md);
       }
       h1 {
         font-family: var(--font-display);
         margin-top: 0;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.35rem;
+        color: var(--forest-deep);
       }
       .row {
         display: grid;
@@ -95,29 +98,35 @@ import { AuthService } from '../../../core/auth.service';
         font-weight: 500;
       }
       input {
-        padding: 0.5rem 0.75rem;
+        padding: 0.65rem 0.85rem;
         border: 1px solid var(--line);
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         font-size: 1rem;
         font-family: var(--font-body);
         outline: none;
+        background: var(--bg);
         transition: border-color 0.15s;
       }
       input:focus {
-        border-color: var(--accent);
+        border-color: var(--forest);
       }
       button {
         width: 100%;
-        padding: 0.75rem;
-        background: var(--accent);
-        color: white;
+        padding: 0.85rem;
+        background: var(--cta);
+        color: var(--on-cta);
         border: none;
-        border-radius: 8px;
+        border-radius: var(--radius-pill);
         font-size: 1rem;
-        font-weight: 600;
+        font-weight: 700;
+        font-family: var(--font-display);
         cursor: pointer;
         margin-top: 0.5rem;
-        transition: opacity 0.15s;
+        box-shadow: 0 6px 16px rgba(232, 135, 42, 0.28);
+        transition: background 0.15s;
+      }
+      button:hover {
+        background: var(--cta-hover);
       }
       button:disabled {
         opacity: 0.6;
@@ -130,16 +139,8 @@ import { AuthService } from '../../../core/auth.service';
         font-size: 0.9rem;
       }
       .auth-link a {
-        color: var(--accent);
-        font-weight: 600;
-      }
-      .banner.error {
-        background: #fde8e8;
-        color: #9b1c1c;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        font-size: 0.9rem;
+        color: var(--forest);
+        font-weight: 700;
       }
     `,
   ],

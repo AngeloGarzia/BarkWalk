@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
+// Émission et lecture des jetons d'accès JWT.
 @Service
 public class JwtService {
     private final JwtProperties properties;

@@ -6,6 +6,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+// Charge un utilisateur Spring Security à partir de l'e-mail.
 @Service
 public class BarkWalkUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;

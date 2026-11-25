@@ -34,6 +34,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+// Jeu de données de démonstration chargé au démarrage si barkwalk.demo.seed-users est actif.
 @Component
 @ConditionalOnProperty(name = "barkwalk.demo.seed-users", havingValue = "true", matchIfMissing = true)
 public class DemoDataInitializer implements ApplicationRunner {

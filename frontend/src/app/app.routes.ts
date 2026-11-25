@@ -1,3 +1,4 @@
+// Routes lazy-loadées de l'application.
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
 

@@ -1,3 +1,4 @@
+// Tableau de bord administration.
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 

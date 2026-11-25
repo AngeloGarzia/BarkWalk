@@ -1,3 +1,4 @@
+// Catalogue filtré par ville sélectionnée.
 import { Component, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
@@ -11,8 +12,15 @@ export interface Walk {
   description: string;
   walkType: string;
   cityId: number;
+  cityName: string | null;
+  meetingPointId: number;
+  meetingPointName: string | null;
+  meetingPointAddress: string | null;
+  lat: number | null;
+  lng: number | null;
   durationMinutes: number;
   priceCents: number;
+  nonMemberPriceCents: number | null;
   capacity: number;
   bookedCount: number;
   startsAt: string;
@@ -73,24 +81,27 @@ export interface Walk {
   styles: [
     `
       .catalog-page {
-        max-width: 820px;
+        max-width: 28rem;
         margin: 0 auto;
-        padding: 1.5rem 1rem;
+        padding: 1.1rem 1rem 1.5rem;
       }
       .page-header {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.1rem;
       }
       h1 {
         font-family: var(--font-display);
         margin: 0 0 0.25rem;
+        color: var(--forest-deep);
+        font-size: 1.45rem;
       }
       .subtitle {
         color: var(--muted);
         margin: 0;
+        font-size: 0.92rem;
       }
       .filter-bar {
-        margin-bottom: 1.75rem;
-        max-width: 360px;
+        margin-bottom: 1.25rem;
+        max-width: 100%;
       }
       .state-msg {
         color: var(--muted);
@@ -99,11 +110,14 @@ export interface Walk {
       }
       .empty-state {
         text-align: center;
-        padding: 3rem 1rem;
+        padding: 2.5rem 1rem;
         color: var(--muted);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
       }
       .empty-icon {
-        font-size: 3rem;
+        font-size: 2rem;
         display: block;
         margin-bottom: 0.75rem;
       }
@@ -113,24 +127,28 @@ export interface Walk {
         margin: 0;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 0.85rem;
       }
       .walk-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.25rem;
+        background: var(--surface);
+        border-radius: var(--radius-md);
+        border: 1px solid var(--line);
+        padding: 1.05rem;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
         gap: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        box-shadow: var(--shadow-sm);
       }
       .walk-info {
         flex: 1;
+        min-width: 0;
       }
       .walk-info h3 {
         margin: 0 0 0.35rem;
-        font-size: 1rem;
+        font-size: 1.02rem;
+        color: var(--forest-deep);
+        font-family: var(--font-display);
       }
       .walk-info p {
         margin: 0 0 0.6rem;
@@ -145,44 +163,48 @@ export interface Walk {
       }
       .tag {
         display: inline-block;
-        background: var(--bg);
-        border-radius: 999px;
-        padding: 2px 10px;
-        font-size: 0.8rem;
-        color: var(--accent);
+        background: var(--forest-soft);
+        border-radius: var(--radius-pill);
+        padding: 0.2rem 0.65rem;
+        font-size: 0.75rem;
+        color: var(--forest);
         font-weight: 600;
       }
       .walk-meta {
         display: flex;
         flex-direction: column;
         align-items: flex-end;
-        gap: 0.3rem;
+        gap: 0.35rem;
         min-width: 90px;
       }
       .price {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: var(--accent);
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: var(--forest);
         font-family: var(--font-display);
       }
       .walker {
-        font-size: 0.82rem;
+        font-size: 0.78rem;
         color: var(--muted);
+        text-align: right;
       }
       .btn-book {
-        margin-top: 0.4rem;
-        background: var(--accent);
-        color: white;
+        margin-top: 0.25rem;
+        background: var(--cta);
+        color: var(--on-cta);
         border: none;
-        border-radius: 8px;
-        padding: 0.4rem 0.9rem;
+        border-radius: var(--radius-pill);
+        padding: 0.5rem 0.95rem;
         font-size: 0.85rem;
-        font-weight: 600;
+        font-weight: 700;
+        font-family: var(--font-display);
         cursor: pointer;
-        transition: opacity 0.15s;
+        text-decoration: none;
+        box-shadow: 0 4px 12px rgba(232, 135, 42, 0.25);
+        transition: background 0.15s;
       }
       .btn-book:hover {
-        opacity: 0.85;
+        background: var(--cta-hover);
       }
     `,
   ],

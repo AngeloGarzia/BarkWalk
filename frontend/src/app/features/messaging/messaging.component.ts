@@ -1,3 +1,4 @@
+// Messagerie entre participants.
 import { Component } from '@angular/core';
 
 @Component({

@@ -1,3 +1,4 @@
+// Consultation du profil connecté.
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth.service';
@@ -42,6 +43,7 @@ interface UserProfile {
             <p class="muted">Balades terminées : {{ profile()?.completedWalksCount }}</p>
           </div>
         </div>
+        <button type="button" class="logout" (click)="logout()">Déconnexion</button>
       } @else if (error()) {
         <p class="banner error" role="alert">{{ error() }}</p>
       }
@@ -50,32 +52,35 @@ interface UserProfile {
   styles: [
     `
       .profile-page {
-        max-width: 640px;
+        max-width: 28rem;
         margin: 0 auto;
-        padding: 1.5rem 1rem;
+        padding: 1.1rem 1rem 1.5rem;
       }
       h1 {
         font-family: var(--font-display);
         margin: 0 0 1.25rem;
+        color: var(--forest-deep);
       }
       .profile-card {
         display: flex;
         gap: 1.25rem;
         align-items: center;
-        background: #fff;
+        background: var(--surface);
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: var(--radius-md);
         padding: 1.25rem;
+        box-shadow: var(--shadow-sm);
       }
       .avatar {
         width: 64px;
         height: 64px;
         border-radius: 50%;
-        background: var(--accent);
-        color: #fff;
+        background: var(--forest);
+        color: var(--on-forest);
         display: grid;
         place-items: center;
-        font-weight: 700;
+        font-weight: 800;
+        font-family: var(--font-display);
         font-size: 1.2rem;
       }
       .email {
@@ -89,9 +94,9 @@ interface UserProfile {
         margin-bottom: 0.5rem;
       }
       .role-badge {
-        background: #ebf4f1;
-        color: var(--accent);
-        border-radius: 999px;
+        background: var(--forest-soft);
+        color: var(--forest);
+        border-radius: var(--radius-pill);
         padding: 0.2rem 0.6rem;
         font-size: 0.75rem;
         font-weight: 600;
@@ -99,11 +104,17 @@ interface UserProfile {
       .muted {
         color: var(--muted);
       }
-      .banner.error {
-        background: #fde8e8;
-        color: #9b1c1c;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
+      .logout {
+        margin-top: 1.25rem;
+        width: 100%;
+        min-height: 2.75rem;
+        border-radius: var(--radius-pill);
+        border: 1.5px solid #e8b4b0;
+        background: transparent;
+        color: var(--danger);
+        font-weight: 700;
+        font-family: var(--font-display);
+        cursor: pointer;
       }
     `,
   ],
@@ -122,6 +133,11 @@ export class ProfileComponent implements OnInit {
     if (!p) return '?';
     return `${p.firstName?.[0] ?? ''}${p.lastName?.[0] ?? ''}`.toUpperCase();
   };
+
+  protected logout(): void {
+    this.auth.logout();
+    this.router.navigate(['/']);
+  }
 
   ngOnInit(): void {
     if (!this.auth.isLoggedIn()) {
