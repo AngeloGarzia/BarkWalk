@@ -2,7 +2,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth.service';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 interface UserProfile {
   userId: number;
@@ -20,7 +20,7 @@ interface UserProfile {
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   template: `
     <div class="profile-page">
       <header class="page-header">
@@ -43,6 +43,7 @@ interface UserProfile {
             <p class="muted">Balades terminées : {{ profile()?.completedWalksCount }}</p>
           </div>
         </div>
+        <a routerLink="/booking" class="bw-btn bw-btn-forest my-bookings">Mes réservations</a>
         <button type="button" class="logout" (click)="logout()">Déconnexion</button>
       } @else if (error()) {
         <p class="banner error" role="alert">{{ error() }}</p>
@@ -104,8 +105,12 @@ interface UserProfile {
       .muted {
         color: var(--muted);
       }
-      .logout {
+      .my-bookings {
         margin-top: 1.25rem;
+        width: 100%;
+      }
+      .logout {
+        margin-top: 0.75rem;
         width: 100%;
         min-height: 2.75rem;
         border-radius: var(--radius-pill);
