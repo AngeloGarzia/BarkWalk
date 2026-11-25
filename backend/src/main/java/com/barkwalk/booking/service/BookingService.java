@@ -42,7 +42,7 @@ public class BookingService {
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
-    @Transactional
+    @Transactional(noRollbackFor = WalkFullException.class)
     public BookingResponse create(BookingRequest request) {
         Long userId = SecurityUtils.currentUserId();
         Walk walk = walkRepository.findByIdForUpdate(request.walkId())
@@ -77,6 +77,10 @@ public class BookingService {
         long occupied = bookingRepository.countByWalkIdAndStatusIn(walk.getId(),
                 List.of("CONFIRMED", "PENDING_PAYMENT"));
         if (occupied >= walk.getCapacity()) {
+            if (waitlistEntryRepository.existsByWalkIdAndDogIdAndStatusIn(
+                    walk.getId(), dog.getId(), List.of("WAITING", "OFFERED"))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Already on waitlist");
+            }
             WaitlistEntry entry = new WaitlistEntry();
             entry.setWalkId(walk.getId());
             entry.setUserId(userId);
@@ -84,7 +88,7 @@ public class BookingService {
             entry.setPosition((int) waitlistEntryRepository.countByWalkId(walk.getId()) + 1);
             entry.setStatus("WAITING");
             waitlistEntryRepository.save(entry);
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Walk full — added to waitlist");
+            throw new WalkFullException();
         }
 
         boolean member = SecurityUtils.currentUser().getRoles().contains(Role.MEMBER)

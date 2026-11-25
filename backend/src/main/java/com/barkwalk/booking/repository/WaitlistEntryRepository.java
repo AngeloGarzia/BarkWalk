@@ -16,4 +16,5 @@ import jakarta.persistence.LockModeType;
 public interface WaitlistEntryRepository extends JpaRepository<WaitlistEntry, Long> {
     List<WaitlistEntry> findByWalkIdAndStatusOrderByPositionAsc(Long walkId, String status);
         long countByWalkId(Long walkId);
+        boolean existsByWalkIdAndDogIdAndStatusIn(Long walkId, Long dogId, Collection<String> statuses);
 }
