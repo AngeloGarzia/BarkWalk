@@ -28,7 +28,7 @@ BarkWalk/
 
 ```bash
 docker compose up -d
-mvn -pl backend spring-boot:run
+./mvnw -pl backend spring-boot:run     # Windows : .\mvnw.cmd -pl backend spring-boot:run
 cd frontend && npm start
 ```
 
