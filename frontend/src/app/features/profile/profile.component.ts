@@ -12,7 +12,7 @@ interface UserProfile {
   bio?: string | null;
   cityId?: number | null;
   completedWalksCount: number;
-  communityOrgEnabled: boolean;
+  communityOrgStatus: string;
   roles: string[];
 }
 

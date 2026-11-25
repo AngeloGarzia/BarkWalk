@@ -10,10 +10,10 @@ import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,14 +58,15 @@ public class BookingService {
                 || !contains(walk.getAcceptedEnergy(), dog.getEnergyLevel())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dog incompatible with walk profile");
         }
-        if (walk.isCommunityDisclaimerRequired() && !request.communityAck()) {
+        if ("COMMUNITY".equals(walk.getWalkType()) && !request.communityAck()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Community disclaimer required");
         }
         if ("COMMUNITY".equals(walk.getWalkType()) && !SecurityUtils.currentUser().getRoles().contains(Role.MEMBER)
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Membership required");
         }
-        if (bookingRepository.existsByWalkIdAndDogIdAndStatusNot(walk.getId(), dog.getId(), "CANCELLED")) {
+        if (bookingRepository.existsByWalkIdAndDogIdAndStatusNotIn(
+                walk.getId(), dog.getId(), List.of("CANCELLED_FREE", "CANCELLED_LATE"))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already booked");
         }
 
@@ -104,6 +105,7 @@ public class BookingService {
         booking.setPaymentRequired(paymentRequired);
         if (paymentRequired) {
             booking.setStatus("PENDING_PAYMENT");
+            booking.setPaymentExpiresAt(Instant.now().plus(Duration.ofMinutes(15)));
         } else {
             booking.setStatus("CONFIRMED");
             booking.setConfirmedAt(Instant.now());
@@ -126,8 +128,12 @@ public class BookingService {
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        booking.setStatus("CANCELLED");
+        // R4 détaillée (gratuit vs tardif + comptage) sera finalisée côté job/règle starts_at ;
+        // défaut conservateur : annulation utilisateur = FREE si >24h avant le départ (appliqué en étape service ultérieure).
+        booking.setStatus("CANCELLED_FREE");
         booking.setCancelledAt(Instant.now());
+        booking.setCancelledByUserId(SecurityUtils.currentUserId());
+        booking.setCancelledByRole("USER");
         return toResponse(booking);
     }
 

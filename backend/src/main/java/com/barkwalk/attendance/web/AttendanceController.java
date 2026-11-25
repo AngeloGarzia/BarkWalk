@@ -63,8 +63,9 @@ public class AttendanceController {
             Profile profile = profileRepository.findById(booking.getUserId()).orElse(null);
             if (profile != null) {
                 profile.setCompletedWalksCount(profile.getCompletedWalksCount() + 1);
-                if (profile.getCompletedWalksCount() >= 3 && !profile.isCommunityOrgRevoked()) {
-                    profile.setCommunityOrgEnabled(true);
+                if (profile.getCompletedWalksCount() >= 3 && !profile.isCommunityOrgRevoked()
+                        && !"ACTIVE".equals(profile.getCommunityOrgStatus())) {
+                    profile.setCommunityOrgStatus("ELIGIBLE");
                 }
             }
             booking.setStatus("COMPLETED");
@@ -81,9 +82,7 @@ public class AttendanceController {
         report.setAuthorId(SecurityUtils.currentUserId());
         report.setActualDurationMinutes(request.actualDurationMinutes());
         report.setRouteDone(request.routeDone());
-        report.setIncidentType(request.incidentType());
-        report.setIncidentDescription(request.incidentDescription());
-        report.setIncidentSeverity(request.incidentSeverity());
+        // Incidents : table dédiée `incidents` (étape 2) — plus de colonnes sur walk_reports
         report = walkReportRepository.save(report);
         if (request.dogNotes() != null) {
             for (DogNote note : request.dogNotes()) {

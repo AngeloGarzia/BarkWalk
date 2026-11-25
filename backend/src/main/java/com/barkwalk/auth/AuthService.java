@@ -71,6 +71,7 @@ public class AuthService {
         profile.setFirstName(request.firstName());
         profile.setLastName(request.lastName());
         profile.setCityId(request.cityId());
+        profile.setCommunityOrgStatus("NONE");
         profileRepository.save(profile);
         return issueTokens(user);
     }

@@ -51,7 +51,7 @@ public class ProfileService {
     private ProfileResponse toResponse(User user, Profile profile) {
         return new ProfileResponse(user.getId(), user.getEmail(), profile.getFirstName(), profile.getLastName(),
                 profile.getPhone(), profile.getBio(), profile.getCityId(), profile.getZoneId(),
-                profile.getCompletedWalksCount(), profile.isCommunityOrgEnabled(),
+                profile.getCompletedWalksCount(), profile.getCommunityOrgStatus(),
                 user.getRoles().stream().map(Enum::name).collect(Collectors.toSet()));
     }
 }

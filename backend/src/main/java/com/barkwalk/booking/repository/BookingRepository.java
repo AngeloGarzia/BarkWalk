@@ -16,5 +16,5 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countByWalkIdAndStatusIn(Long walkId, Collection<String> statuses);
         List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
         List<Booking> findByWalkId(Long walkId);
-        boolean existsByWalkIdAndDogIdAndStatusNot(Long walkId, Long dogId, String status);
+        boolean existsByWalkIdAndDogIdAndStatusNotIn(Long walkId, Long dogId, Collection<String> statuses);
 }

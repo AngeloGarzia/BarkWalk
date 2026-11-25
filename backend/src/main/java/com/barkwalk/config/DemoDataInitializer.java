@@ -273,7 +273,7 @@ public class DemoDataInitializer implements ApplicationRunner {
 
         Profile aliceProfile = profileRepository.findById(alice.getId()).orElseThrow();
         aliceProfile.setCompletedWalksCount(3);
-        aliceProfile.setCommunityOrgEnabled(true);
+        aliceProfile.setCommunityOrgStatus("ACTIVE");
         aliceProfile.setPhone("+33600000001");
 
         if (dogRepository.findByOwnerIdOrderByNameAsc(alice.getId()).isEmpty()) {
@@ -363,7 +363,6 @@ public class DemoDataInitializer implements ApplicationRunner {
             }
             if ("COMMUNITY".equals(spot.walkType())) {
                 walk.setOrganizerUserId(alice.getId());
-                walk.setCommunityDisclaimerRequired(true);
                 walk.setAcceptedSizes(new String[] {"SMALL", "MEDIUM"});
                 walk.setAcceptedEnergy(new String[] {"LOW", "MEDIUM"});
             } else {

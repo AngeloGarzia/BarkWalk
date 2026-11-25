@@ -71,7 +71,10 @@ public class WalkService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST));
             int threshold = Integer.parseInt(settingRepository.findById("community_walks_threshold")
                     .map(Setting::getValue).orElse("3"));
-            if (!admin && (profile.getCompletedWalksCount() < threshold || profile.isCommunityOrgRevoked())) {
+            boolean orgOk = "ACTIVE".equals(profile.getCommunityOrgStatus())
+                    || ("ELIGIBLE".equals(profile.getCommunityOrgStatus())
+                            && profile.getCompletedWalksCount() >= threshold);
+            if (!admin && (!orgOk || profile.isCommunityOrgRevoked())) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Community organizer rights required");
             }
         } else if (!admin && !staff) {
@@ -96,9 +99,6 @@ public class WalkService {
         walk.setWalkerId(request.walkerId());
         if ("COMMUNITY".equals(request.walkType())) {
             walk.setOrganizerUserId(principal.getId());
-            walk.setCommunityDisclaimerRequired(true);
-        } else {
-            walk.setCommunityDisclaimerRequired(request.communityDisclaimerRequired());
         }
         walk.setAcceptedSizes(request.acceptedSizes().toArray(String[]::new));
         walk.setAcceptedEnergy(request.acceptedEnergy().toArray(String[]::new));

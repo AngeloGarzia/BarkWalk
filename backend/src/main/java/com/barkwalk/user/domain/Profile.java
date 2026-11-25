@@ -32,11 +32,8 @@ public class Profile {
     @Column(name = "zone_id")
     private Long zoneId;
 
-    @Column(name = "community_org_enabled", nullable = false)
-    private boolean communityOrgEnabled;
-
-    @Column(name = "community_org_revoked", nullable = false)
-    private boolean communityOrgRevoked;
+    @Column(name = "community_org_status", nullable = false)
+    private String communityOrgStatus = "NONE";
 
     @Column(name = "completed_walks_count", nullable = false)
     private int completedWalksCount;
@@ -111,20 +108,20 @@ public class Profile {
         this.zoneId = zoneId;
     }
 
-    public boolean isCommunityOrgEnabled() {
-        return communityOrgEnabled;
+    public String getCommunityOrgStatus() {
+        return communityOrgStatus;
     }
 
-    public void setCommunityOrgEnabled(boolean communityOrgEnabled) {
-        this.communityOrgEnabled = communityOrgEnabled;
+    public void setCommunityOrgStatus(String communityOrgStatus) {
+        this.communityOrgStatus = communityOrgStatus;
+    }
+
+    public boolean isCommunityOrgActive() {
+        return "ACTIVE".equals(communityOrgStatus);
     }
 
     public boolean isCommunityOrgRevoked() {
-        return communityOrgRevoked;
-    }
-
-    public void setCommunityOrgRevoked(boolean communityOrgRevoked) {
-        this.communityOrgRevoked = communityOrgRevoked;
+        return "REVOKED".equals(communityOrgStatus);
     }
 
     public int getCompletedWalksCount() {

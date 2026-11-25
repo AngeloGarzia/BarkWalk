@@ -70,8 +70,14 @@ public class Walk {
     @Column(name = "route_hint")
     private String routeHint;
 
-    @Column(name = "community_disclaimer_required", nullable = false)
-    private boolean communityDisclaimerRequired;
+    @Column(name = "cancelled_by_user_id")
+    private Long cancelledByUserId;
+
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
+
+    @Column(name = "recurrence_rule_id")
+    private Long recurrenceRuleId;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
@@ -219,12 +225,33 @@ public class Walk {
         this.routeHint = routeHint;
     }
 
+    /** Disclaimer communautaire dérivé du type de balade (plus de colonne dédiée). */
     public boolean isCommunityDisclaimerRequired() {
-        return communityDisclaimerRequired;
+        return "COMMUNITY".equals(walkType);
     }
 
-    public void setCommunityDisclaimerRequired(boolean communityDisclaimerRequired) {
-        this.communityDisclaimerRequired = communityDisclaimerRequired;
+    public Long getCancelledByUserId() {
+        return cancelledByUserId;
+    }
+
+    public void setCancelledByUserId(Long cancelledByUserId) {
+        this.cancelledByUserId = cancelledByUserId;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
+    public Long getRecurrenceRuleId() {
+        return recurrenceRuleId;
+    }
+
+    public void setRecurrenceRuleId(Long recurrenceRuleId) {
+        this.recurrenceRuleId = recurrenceRuleId;
     }
 
     public Instant getCreatedAt() {

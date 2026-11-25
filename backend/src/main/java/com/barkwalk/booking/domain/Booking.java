@@ -49,8 +49,29 @@ public class Booking {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
+    @Column(name = "payment_expires_at")
+    private Instant paymentExpiresAt;
+
+    @Column(name = "cancelled_by_user_id")
+    private Long cancelledByUserId;
+
+    @Column(name = "cancelled_by_role")
+    private String cancelledByRole;
+
+    @Column(name = "cancellation_reason")
+    private String cancellationReason;
+
+    @Column(name = "counts_toward_org_threshold", nullable = false)
+    private boolean countsTowardOrgThreshold;
+
+    @Column(name = "counts_toward_membership_quota", nullable = false)
+    private boolean countsTowardMembershipQuota;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt = Instant.now();
 
     public Long getId() {
         return id;
@@ -146,5 +167,53 @@ public class Booking {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getPaymentExpiresAt() {
+        return paymentExpiresAt;
+    }
+
+    public void setPaymentExpiresAt(Instant paymentExpiresAt) {
+        this.paymentExpiresAt = paymentExpiresAt;
+    }
+
+    public Long getCancelledByUserId() {
+        return cancelledByUserId;
+    }
+
+    public void setCancelledByUserId(Long cancelledByUserId) {
+        this.cancelledByUserId = cancelledByUserId;
+    }
+
+    public String getCancelledByRole() {
+        return cancelledByRole;
+    }
+
+    public void setCancelledByRole(String cancelledByRole) {
+        this.cancelledByRole = cancelledByRole;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
+    public boolean isCountsTowardOrgThreshold() {
+        return countsTowardOrgThreshold;
+    }
+
+    public void setCountsTowardOrgThreshold(boolean countsTowardOrgThreshold) {
+        this.countsTowardOrgThreshold = countsTowardOrgThreshold;
+    }
+
+    public boolean isCountsTowardMembershipQuota() {
+        return countsTowardMembershipQuota;
+    }
+
+    public void setCountsTowardMembershipQuota(boolean countsTowardMembershipQuota) {
+        this.countsTowardMembershipQuota = countsTowardMembershipQuota;
     }
 }
