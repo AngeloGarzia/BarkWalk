@@ -175,6 +175,34 @@ class BookingServiceTest {
     }
 
     @Test
+    void cancel_rejectsBookingThatIsNoLongerActive() {
+        Booking booking = new Booking();
+        booking.setUserId(1L);
+        booking.setStatus("COMPLETED");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+
+        assertThatThrownBy(() -> bookingService.cancel(3L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(booking.getStatus()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void cancel_byAdminOnAnotherUsersBooking_recordsAdminRole() {
+        SecurityTestSupport.authenticate(50L, "admin@example.com", Role.ADMIN);
+        Booking booking = new Booking();
+        booking.setUserId(1L);
+        booking.setStatus("CONFIRMED");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+
+        bookingService.cancel(3L);
+
+        assertThat(booking.getCancelledByRole()).isEqualTo("ADMIN");
+        assertThat(booking.getCancelledByUserId()).isEqualTo(50L);
+    }
+
+    @Test
     void mine_delegatesToRepository() {
         when(bookingRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
         assertThat(bookingService.mine()).isEmpty();

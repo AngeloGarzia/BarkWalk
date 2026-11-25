@@ -133,16 +133,20 @@ public class BookingService {
     public BookingResponse cancel(Long id) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!booking.getUserId().equals(SecurityUtils.currentUserId())
-                && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+        Long currentUserId = SecurityUtils.currentUserId();
+        boolean owner = booking.getUserId().equals(currentUserId);
+        if (!owner && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if (!"CONFIRMED".equals(booking.getStatus()) && !"PENDING_PAYMENT".equals(booking.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Booking is not active");
         }
         // Pour l'instant toute annulation utilisateur est marquée gratuite.
         // Le basculement tardif (comptage quota et seuil organisateur) se calcule à partir de starts_at.
         booking.setStatus("CANCELLED_FREE");
         booking.setCancelledAt(Instant.now());
-        booking.setCancelledByUserId(SecurityUtils.currentUserId());
-        booking.setCancelledByRole("USER");
+        booking.setCancelledByUserId(currentUserId);
+        booking.setCancelledByRole(owner ? "USER" : "ADMIN");
         return toResponse(booking);
     }
 
