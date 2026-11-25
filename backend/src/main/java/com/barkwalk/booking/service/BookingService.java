@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,8 @@ import org.springframework.web.server.ResponseStatusException;
 // Réservation transactionnelle : compatibilité chien, capacité, paiement éventuel, liste d'attente.
 @Service
 public class BookingService {
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
+
     private final BookingRepository bookingRepository;
     private final WaitlistEntryRepository waitlistEntryRepository;
     private final WalkRepository walkRepository;
@@ -142,6 +146,14 @@ public class BookingService {
     public BookingResponse confirmPayment(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!"PENDING_PAYMENT".equals(booking.getStatus())) {
+            // Paiement reçu pour une réservation déjà confirmée (rejeu) ou expirée/annulée :
+            // on ne ressuscite pas la place, un remboursement manuel est nécessaire dans ce cas.
+            if (!"CONFIRMED".equals(booking.getStatus())) {
+                log.warn("Payment received for booking {} in status {}: refund required", bookingId, booking.getStatus());
+            }
+            return toResponse(booking);
+        }
         booking.setStatus("CONFIRMED");
         booking.setConfirmedAt(Instant.now());
         return toResponse(booking);

@@ -17,6 +17,7 @@ import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -128,6 +129,31 @@ class BookingServiceTest {
         var response = bookingService.confirmPayment(8L);
         assertThat(response.status()).isEqualTo("CONFIRMED");
         assertThat(booking.getConfirmedAt()).isNotNull();
+    }
+
+    @Test
+    void confirmPayment_doesNotResurrectCancelledBooking() {
+        Booking booking = new Booking();
+        booking.setStatus("CANCELLED_FREE");
+        when(bookingRepository.findById(8L)).thenReturn(Optional.of(booking));
+
+        var response = bookingService.confirmPayment(8L);
+
+        assertThat(response.status()).isEqualTo("CANCELLED_FREE");
+        assertThat(booking.getConfirmedAt()).isNull();
+    }
+
+    @Test
+    void confirmPayment_keepsOriginalConfirmationTimeWhenAlreadyConfirmed() {
+        Booking booking = new Booking();
+        booking.setStatus("CONFIRMED");
+        Instant firstConfirmation = Instant.parse("2026-01-01T10:00:00Z");
+        booking.setConfirmedAt(firstConfirmation);
+        when(bookingRepository.findById(8L)).thenReturn(Optional.of(booking));
+
+        bookingService.confirmPayment(8L);
+
+        assertThat(booking.getConfirmedAt()).isEqualTo(firstConfirmation);
     }
 
     @Test
