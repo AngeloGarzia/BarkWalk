@@ -21,6 +21,10 @@
         <bucket4j.version>8.14.0</bucket4j.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <testcontainers.version>1.20.5</testcontainers.version>
+        <jacoco.version>0.8.12</jacoco.version>
+        <!-- Seuils bloquants étape 1 CI -->
+        <jacoco.bundle.line.minimum>0.80</jacoco.bundle.line.minimum>
+        <jacoco.critical.line.minimum>0.90</jacoco.critical.line.minimum>
     </properties>
 
     <dependencies>
@@ -153,11 +157,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
@@ -167,6 +166,16 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -195,6 +204,123 @@
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- *Test = unitaire ; *IT = intégration (failsafe) -->
+                    <excludes>
+                        <exclude>**/*IT.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <!-- Hors périmètre : JPA/repos/DTO + modules hors packages critiques étape 1 -->
+                    <excludes>
+                        <exclude>com/barkwalk/BarkWalkApplication.class</exclude>
+                        <exclude>**/domain/**</exclude>
+                        <exclude>**/repository/**</exclude>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/*Dtos.class</exclude>
+                        <exclude>**/config/**</exclude>
+                        <exclude>**/storage/**</exclude>
+                        <exclude>**/messaging/**</exclude>
+                        <exclude>**/moderation/**</exclude>
+                        <exclude>**/attendance/**</exclude>
+                        <exclude>**/review/**</exclude>
+                        <exclude>**/walker/**</exclude>
+                        <exclude>**/admin/**</exclude>
+                        <exclude>**/membership/**</exclude>
+                        <exclude>**/city/**</exclude>
+                        <exclude>**/user/web/**</exclude>
+                        <exclude>**/user/service/**</exclude>
+                        <exclude>**/booking/web/**</exclude>
+                        <exclude>**/walk/web/**</exclude>
+                        <exclude>**/dog/web/**</exclude>
+                        <exclude>**/web/ApiExceptionHandler.class</exclude>
+                        <exclude>**/auth/ratelimit/**</exclude>
+                        <exclude>**/common/AuditLog.class</exclude>
+                        <exclude>**/common/AuditLogRepository.class</exclude>
+                        <exclude>**/common/Role.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.bundle.line.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.barkwalk.auth</include>
+                                        <include>com.barkwalk.auth.jwt</include>
+                                        <include>com.barkwalk.auth.web</include>
+                                        <include>com.barkwalk.booking.service</include>
+                                        <include>com.barkwalk.walk.service</include>
+                                        <include>com.barkwalk.dog.service</include>
+                                        <include>com.barkwalk.payment.web</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.critical.line.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

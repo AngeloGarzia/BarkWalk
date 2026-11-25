@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.barkwalk.support.PostgresTestcontainers;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -24,20 +25,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class SchemaIntegrityStep1IT {
 
     @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:17-alpine").withDatabaseName("barkwalk").withUsername("barkwalk").withPassword("barkwalk");
+    static final PostgreSQLContainer<?> POSTGRES = PostgresTestcontainers.create();
 
     @DynamicPropertySource
     static void datasourceProps(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
-        registry.add("barkwalk.demo.seed-users", () -> "false");
-        registry.add("barkwalk.jwt.secret", () -> "barkwalk-test-secret-key-32chars-min!!");
-        registry.add("spring.docker.compose.enabled", () -> "false");
+        PostgresTestcontainers.register(registry, POSTGRES);
     }
 
     @Autowired
@@ -188,7 +180,8 @@ class SchemaIntegrityStep1IT {
         assertThatThrownBy(() -> insertBooking(walkId, userId, dogId, "PENDING_PAYMENT", false))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
-        jdbc.update("UPDATE bookings SET status = 'CANCELLED' WHERE walk_id = ? AND dog_id = ?", walkId, dogId);
+        jdbc.update(
+                "UPDATE bookings SET status = 'CANCELLED_FREE' WHERE walk_id = ? AND dog_id = ?", walkId, dogId);
         Long secondId = insertBooking(walkId, userId, dogId, "CONFIRMED", false);
         assertThat(secondId).isPositive();
     }

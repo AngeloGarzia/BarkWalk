@@ -1,29 +1,26 @@
 package com.barkwalk;
 
+import com.barkwalk.support.PostgresTestcontainers;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest
+@Testcontainers(disabledWithoutDocker = true)
 class BarkWalkApplicationTests {
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = PostgresTestcontainers.create();
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
-        registry.add(
-                "spring.datasource.url",
-                () -> "jdbc:h2:mem:barkwalk;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;NON_KEYWORDS=KEY,VALUE");
-        registry.add("spring.datasource.username", () -> "sa");
-        registry.add("spring.datasource.password", () -> "");
-        registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        registry.add("spring.flyway.enabled", () -> "false");
-        registry.add("spring.docker.compose.enabled", () -> "false");
-        registry.add("barkwalk.demo.seed-users", () -> "false");
-        registry.add("barkwalk.jwt.secret", () -> "barkwalk-test-secret-key-32chars-min!!");
+        PostgresTestcontainers.register(registry, POSTGRES);
     }
 
     @Test
-    void contextLoads() {
-    }
+    void contextLoads() {}
 }

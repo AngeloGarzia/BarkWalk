@@ -1,0 +1,217 @@
+package com.barkwalk.dog.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.barkwalk.common.AuditService;
+import com.barkwalk.common.Role;
+import com.barkwalk.dog.domain.Dog;
+import com.barkwalk.dog.domain.DogDocument;
+import com.barkwalk.dog.repository.DogDocumentRepository;
+import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.dog.web.DogDtos.DogRequest;
+import com.barkwalk.dog.web.DogDtos.DocumentRequest;
+import com.barkwalk.storage.StorageService;
+import com.barkwalk.support.SecurityTestSupport;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+@ExtendWith(MockitoExtension.class)
+class DogServiceTest {
+
+    @Mock
+    private DogRepository dogRepository;
+    @Mock
+    private DogDocumentRepository documentRepository;
+    @Mock
+    private StorageService storageService;
+    @Mock
+    private AuditService auditService;
+
+    @InjectMocks
+    private DogService dogService;
+
+    @BeforeEach
+    void auth() {
+        SecurityTestSupport.authenticate(1L, "owner@example.com", Role.USER);
+    }
+
+    @AfterEach
+    void clear() {
+        SecurityTestSupport.clear();
+    }
+
+    @Test
+    void create_setsDraftAndOwner() {
+        when(dogRepository.save(any(Dog.class))).thenAnswer(inv -> {
+            Dog d = inv.getArgument(0);
+            setId(d, 11L);
+            return d;
+        });
+        var response = dogService.create(sampleRequest());
+        assertThat(response.id()).isEqualTo(11L);
+        assertThat(response.dossierStatus()).isEqualTo("DRAFT");
+        assertThat(response.name()).isEqualTo("Rex");
+    }
+
+    @Test
+    void update_forbiddenForForeignDog() {
+        Dog dog = ownedDog(5L, 99L);
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        assertThatThrownBy(() -> dogService.update(5L, sampleRequest()))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void submit_setsPending() {
+        Dog dog = ownedDog(5L, 1L);
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        var response = dogService.submit(5L);
+        assertThat(response.dossierStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void validate_requiresAdmin() {
+        assertThatThrownBy(() -> dogService.validate(5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void validate_asAdmin() {
+        SecurityTestSupport.clear();
+        SecurityTestSupport.authenticate(2L, "admin@example.com", Role.USER, Role.ADMIN);
+        Dog dog = ownedDog(5L, 1L);
+        dog.setDossierStatus("PENDING");
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        var response = dogService.validate(5L);
+        assertThat(response.dossierStatus()).isEqualTo("VALIDATED");
+        verify(auditService).log(eq(2L), eq("DOG_VALIDATE"), eq("DOG"), eq(5L), eq(null));
+    }
+
+    @Test
+    void refuse_asAdmin() {
+        SecurityTestSupport.clear();
+        SecurityTestSupport.authenticate(2L, "admin@example.com", Role.USER, Role.ADMIN);
+        Dog dog = ownedDog(5L, 1L);
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        var response = dogService.refuse(5L, "papers");
+        assertThat(response.dossierStatus()).isEqualTo("REFUSED");
+        assertThat(response.refusalReason()).isEqualTo("papers");
+    }
+
+    @Test
+    void addDocument_andList() {
+        Dog dog = ownedDog(5L, 1L);
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        when(documentRepository.save(any(DogDocument.class))).thenAnswer(inv -> {
+            DogDocument d = inv.getArgument(0);
+            setId(d, 20L);
+            return d;
+        });
+        when(storageService.signedGetUrl("key")).thenReturn("https://signed");
+        var doc = dogService.addDocument(5L, new DocumentRequest("VACCINE", "key", LocalDate.now().plusYears(1)));
+        assertThat(doc.signedUrl()).isEqualTo("https://signed");
+
+        when(documentRepository.findByDogId(5L)).thenReturn(List.of());
+        assertThat(dogService.documents(5L)).isEmpty();
+    }
+
+    @Test
+    void myDogs_andDelete() {
+        when(dogRepository.findByOwnerIdOrderByNameAsc(1L)).thenReturn(List.of());
+        assertThat(dogService.myDogs()).isEmpty();
+        Dog dog = ownedDog(5L, 1L);
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        dogService.delete(5L);
+        verify(dogRepository).delete(dog);
+    }
+
+    @Test
+    void pending_lists() {
+        when(dogRepository.findByDossierStatus("PENDING")).thenReturn(List.of());
+        assertThat(dogService.pending()).isEmpty();
+    }
+
+    @Test
+    void update_resetsDraftWhenNotValidated() {
+        Dog dog = ownedDog(5L, 1L);
+        dog.setDossierStatus("PENDING");
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        var response = dogService.update(5L, sampleRequest());
+        assertThat(response.dossierStatus()).isEqualTo("DRAFT");
+        assertThat(response.breed()).isEqualTo("Berger");
+    }
+
+    @Test
+    void documents_forbiddenForForeignOwner() {
+        Dog dog = ownedDog(5L, 99L);
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        assertThatThrownBy(() -> dogService.documents(5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    private static DogRequest sampleRequest() {
+        return new DogRequest(
+                "Rex",
+                "Berger",
+                LocalDate.of(2020, 1, 1),
+                "MALE",
+                true,
+                new BigDecimal("28.5"),
+                "LARGE",
+                "123",
+                "HIGH",
+                "GOOD",
+                "GOOD",
+                "GOOD",
+                "LOW",
+                null,
+                null);
+    }
+
+    private static Dog ownedDog(long id, long ownerId) {
+        Dog dog = new Dog();
+        setId(dog, id);
+        dog.setOwnerId(ownerId);
+        dog.setName("Rex");
+        dog.setBreed("Berger");
+        dog.setSex("MALE");
+        dog.setSizeCategory("LARGE");
+        dog.setEnergyLevel("HIGH");
+        dog.setSociabilityDogs("GOOD");
+        dog.setSociabilityHumans("GOOD");
+        dog.setDossierStatus("DRAFT");
+        return dog;
+    }
+
+    private static void setId(Object entity, long id) {
+        try {
+            var f = entity.getClass().getDeclaredField("id");
+            f.setAccessible(true);
+            f.set(entity, id);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+}
