@@ -157,6 +157,24 @@ class BookingServiceTest {
     }
 
     @Test
+    void expireUnpaidBookings_releasesSeatsWhosePaymentWindowIsOver() {
+        Instant now = Instant.parse("2026-11-25T12:00:00Z");
+        Booking expired = new Booking();
+        expired.setStatus("PENDING_PAYMENT");
+        expired.setPaymentExpiresAt(now.minusSeconds(1));
+        when(bookingRepository.findByStatusAndPaymentExpiresAtBefore("PENDING_PAYMENT", now))
+                .thenReturn(List.of(expired));
+
+        int released = bookingService.expireUnpaidBookings(now);
+
+        assertThat(released).isEqualTo(1);
+        assertThat(expired.getStatus()).isEqualTo("CANCELLED_FREE");
+        assertThat(expired.getCancelledAt()).isEqualTo(now);
+        assertThat(expired.getCancelledByRole()).isEqualTo("SYSTEM");
+        assertThat(expired.getCancellationReason()).isEqualTo("PAYMENT_EXPIRED");
+    }
+
+    @Test
     void mine_delegatesToRepository() {
         when(bookingRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
         assertThat(bookingService.mine()).isEmpty();

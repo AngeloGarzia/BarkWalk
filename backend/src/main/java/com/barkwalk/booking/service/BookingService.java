@@ -163,6 +163,19 @@ public class BookingService {
         return toResponse(booking);
     }
 
+    // R6 : une place réservée sans paiement sous 15 minutes est libérée.
+    @Transactional
+    public int expireUnpaidBookings(Instant now) {
+        List<Booking> expired = bookingRepository.findByStatusAndPaymentExpiresAtBefore("PENDING_PAYMENT", now);
+        for (Booking booking : expired) {
+            booking.setStatus("CANCELLED_FREE");
+            booking.setCancelledAt(now);
+            booking.setCancelledByRole("SYSTEM");
+            booking.setCancellationReason("PAYMENT_EXPIRED");
+        }
+        return expired.size();
+    }
+
     private boolean contains(String[] values, String value) {
         if (values == null || value == null) {
             return false;
