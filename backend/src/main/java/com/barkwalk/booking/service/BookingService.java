@@ -140,9 +140,11 @@ public class BookingService {
         return toResponse(booking);
     }
 
-    private boolean contains(String csv, String value) {
-        if (csv == null || value == null) return false;
-        return Arrays.stream(csv.split(",")).map(String::trim).anyMatch(v -> v.equalsIgnoreCase(value));
+    private boolean contains(String[] values, String value) {
+        if (values == null || value == null) {
+            return false;
+        }
+        return Arrays.stream(values).anyMatch(v -> v != null && v.equalsIgnoreCase(value));
     }
 
     private BookingResponse toResponse(Booking b) {

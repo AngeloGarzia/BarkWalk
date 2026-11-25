@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "walks")
@@ -54,11 +56,13 @@ public class Walk {
     @Column(nullable = false)
     private String status = "PUBLISHED";
 
-    @Column(name = "accepted_sizes", nullable = false)
-    private String acceptedSizes;
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "accepted_sizes", nullable = false, columnDefinition = "text[]")
+    private String[] acceptedSizes;
 
-    @Column(name = "accepted_energy", nullable = false)
-    private String acceptedEnergy;
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "accepted_energy", nullable = false, columnDefinition = "text[]")
+    private String[] acceptedEnergy;
 
     @Column(name = "min_sociability_dogs")
     private String minSociabilityDogs;
@@ -183,19 +187,19 @@ public class Walk {
         this.status = status;
     }
 
-    public String getAcceptedSizes() {
+    public String[] getAcceptedSizes() {
         return acceptedSizes;
     }
 
-    public void setAcceptedSizes(String acceptedSizes) {
+    public void setAcceptedSizes(String[] acceptedSizes) {
         this.acceptedSizes = acceptedSizes;
     }
 
-    public String getAcceptedEnergy() {
+    public String[] getAcceptedEnergy() {
         return acceptedEnergy;
     }
 
-    public void setAcceptedEnergy(String acceptedEnergy) {
+    public void setAcceptedEnergy(String[] acceptedEnergy) {
         this.acceptedEnergy = acceptedEnergy;
     }
 
