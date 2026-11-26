@@ -1,33 +1,148 @@
 package com.barkwalk.storage;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
-// Stockage objet privé et URLs signées à courte durée (jamais d'URL publique permanente).
+// Stockage objet : disque local en dev + URLs /api/media/... ; stubs MinIO conservés pour docs.
 @Service
 public class StorageService {
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/jpeg", "image/jpg", "image/png", "image/webp");
+    private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+
     private final String bucket;
     private final int signedUrlMinutes;
+    private final Path localRoot;
 
     public StorageService(
             @Value("${barkwalk.s3.bucket}") String bucket,
-            @Value("${barkwalk.s3.signed-url-minutes:15}") int signedUrlMinutes) {
+            @Value("${barkwalk.s3.signed-url-minutes:15}") int signedUrlMinutes,
+            @Value("${barkwalk.storage.local-path:./data/uploads}") String localPath) throws IOException {
         this.bucket = bucket;
         this.signedUrlMinutes = signedUrlMinutes;
+        this.localRoot = Path.of(localPath).toAbsolutePath().normalize();
+        Files.createDirectories(this.localRoot);
     }
 
     public String createObjectKey(String folder, String filename) {
-        return folder + "/" + UUID.randomUUID() + "-" + filename.replaceAll("[^a-zA-Z0-9._-]", "_");
+        return folder + "/" + UUID.randomUUID() + "-" + sanitizeFilename(filename);
+    }
+
+    public String storeImage(String folder, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier image requis");
+        }
+        if (file.getSize() > MAX_IMAGE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image trop lourde (max 5 Mo)");
+        }
+        String contentType = normalizeContentType(file.getContentType());
+        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formats acceptés : JPEG, PNG, WebP");
+        }
+        String ext = extensionFor(contentType, file.getOriginalFilename());
+        String key = createObjectKey(folder, "photo." + ext);
+        Path target = resolveSafe(key);
+        try {
+            Files.createDirectories(target.getParent());
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Échec enregistrement image");
+        }
+        return key;
+    }
+
+    public void deleteObject(String storageKey) {
+        if (storageKey == null || storageKey.isBlank()) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(resolveSafe(storageKey));
+        } catch (IOException ignored) {
+            // best-effort
+        }
+    }
+
+    public Resource loadAsResource(String storageKey) {
+        try {
+            Path path = resolveSafe(storageKey);
+            if (!Files.exists(path) || !Files.isRegularFile(path)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            }
+            Resource resource = new UrlResource(path.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            }
+            return resource;
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    public String publicMediaUrl(String storageKey) {
+        return "/api/media/" + storageKey;
     }
 
     /** Dev-friendly signed URL stub (MinIO/S3 wiring can replace this). */
     public String signedGetUrl(String storageKey) {
-        return "http://localhost:9000/" + bucket + "/" + storageKey + "?ttl=" + Duration.ofMinutes(signedUrlMinutes).toMinutes();
+        return "http://localhost:9000/" + bucket + "/" + storageKey + "?ttl="
+                + Duration.ofMinutes(signedUrlMinutes).toMinutes();
     }
 
     public String signedPutUrl(String storageKey) {
         return signedGetUrl(storageKey) + "&method=PUT";
+    }
+
+    private Path resolveSafe(String storageKey) {
+        Path resolved = localRoot.resolve(storageKey).normalize();
+        if (!resolved.startsWith(localRoot)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Clé de stockage invalide");
+        }
+        return resolved;
+    }
+
+    private static String sanitizeFilename(String filename) {
+        String name = filename == null || filename.isBlank() ? "file.bin" : filename;
+        return name.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private static String normalizeContentType(String contentType) {
+        if (contentType == null) {
+            return "";
+        }
+        return contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
+    }
+
+    private static String extensionFor(String contentType, String originalFilename) {
+        return switch (contentType) {
+            case "image/png" -> "png";
+            case "image/webp" -> "webp";
+            default -> {
+                if (originalFilename != null && originalFilename.toLowerCase(Locale.ROOT).endsWith(".png")) {
+                    yield "png";
+                }
+                if (originalFilename != null && originalFilename.toLowerCase(Locale.ROOT).endsWith(".webp")) {
+                    yield "webp";
+                }
+                yield "jpg";
+            }
+        };
     }
 }

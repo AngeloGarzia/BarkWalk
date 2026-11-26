@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 public final class DogDtos {
     private DogDtos() {}
@@ -27,11 +28,14 @@ public final class DogDtos {
             String dangerCategory
     ) {}
 
+    public record PhotoResponse(Long id, String url, short sortOrder) {}
+
     public record DogResponse(
             Long id, String name, String breed, LocalDate birthDate, String sex, boolean sterilized,
             BigDecimal weightKg, String sizeCategory, String identificationNumber, String energyLevel,
             String sociabilityDogs, String sociabilityHumans, String recallLevel, String leashPulling,
-            String attentionNotes, String dangerCategory, String dossierStatus, String refusalReason, Instant createdAt
+            String attentionNotes, String dangerCategory, String dossierStatus, String refusalReason,
+            Instant createdAt, List<PhotoResponse> photos
     ) {}
 
     public record DocumentRequest(@NotBlank String docType, @NotBlank String filename, LocalDate expiresAt) {}

@@ -1,4 +1,10 @@
 // Types TypeScript alignés sur l'API chiens.
+export interface DogPhoto {
+  id: number;
+  url: string;
+  sortOrder: number;
+}
+
 export interface Dog {
   id: number;
   name: string;
@@ -19,6 +25,7 @@ export interface Dog {
   dossierStatus: string;
   refusalReason?: string | null;
   createdAt: string;
+  photos?: DogPhoto[];
 }
 
 export interface DogRequest {

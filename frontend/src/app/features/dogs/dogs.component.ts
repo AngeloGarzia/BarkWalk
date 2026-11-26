@@ -4,11 +4,15 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Dog } from '../../models/dog';
 import { BreedService } from '../../services/breed.service';
+import {
+  PhotoItem,
+  PhotoUploaderComponent,
+} from '../../shared/photo-uploader/photo-uploader.component';
 
 @Component({
   selector: 'app-dogs',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, PhotoUploaderComponent],
   template: `
     <div class="dogs-page">
       <header class="page-header">
@@ -89,6 +93,7 @@ import { BreedService } from '../../services/breed.service';
             <input formControlName="sterilized" type="checkbox" />
             Stérilisé
           </label>
+          <p class="field-hint">Les photos (1 à 3) s’ajoutent après l’enregistrement du chien.</p>
           <button type="submit" [disabled]="form.invalid || loading()">Enregistrer</button>
         </form>
       </section>
@@ -105,17 +110,28 @@ import { BreedService } from '../../services/breed.service';
         } @else {
           <ul class="dog-list">
             @for (dog of dogs(); track dog.id) {
-              <li>
-                <div>
-                  <strong>{{ dog.name }}</strong>
-                  <span>{{ dog.breed }} · {{ dog.sizeCategory }} · {{ dog.dossierStatus }}</span>
-                </div>
-                <div class="actions">
-                  @if (dog.dossierStatus === 'DRAFT') {
-                    <button type="button" class="btn-ghost" (click)="submit(dog.id)">Soumettre</button>
+              <li class="dog-card">
+                <div class="dog-top">
+                  @if (dog.photos?.length) {
+                    <img class="thumb" [src]="dog.photos![0].url" [alt]="dog.name" />
                   }
-                  <button type="button" class="btn-danger" (click)="remove(dog.id)">Supprimer</button>
+                  <div class="dog-meta">
+                    <strong>{{ dog.name }}</strong>
+                    <span>{{ dog.breed }} · {{ dog.sizeCategory }} · {{ dog.dossierStatus }}</span>
+                  </div>
+                  <div class="actions">
+                    @if (dog.dossierStatus === 'DRAFT') {
+                      <button type="button" class="btn-ghost" (click)="submit(dog.id)">Soumettre</button>
+                    }
+                    <button type="button" class="btn-danger" (click)="remove(dog.id)">Supprimer</button>
+                  </div>
                 </div>
+                <app-photo-uploader
+                  [title]="'Photos de ' + dog.name"
+                  [uploadUrl]="'/api/dogs/' + dog.id + '/photos'"
+                  [initialPhotos]="dog.photos ?? []"
+                  (photosChange)="onDogPhotos(dog.id, $event)"
+                />
               </li>
             }
           </ul>
@@ -217,17 +233,33 @@ import { BreedService } from '../../services/breed.service';
         list-style: none;
         margin: 0;
         padding: 0;
-      }
-      .dog-list li {
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
         gap: 1rem;
-        padding: 0.85rem 0;
+      }
+      .dog-card {
+        padding: 0.85rem 0 0.25rem;
         border-bottom: 1px solid var(--line);
       }
-      .dog-list li > div {
+      .dog-top {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        margin-bottom: 0.35rem;
+      }
+      .thumb {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 12px;
+        object-fit: cover;
+        flex-shrink: 0;
+        border: 1px solid var(--line);
+      }
+      .dog-meta {
+        flex: 1;
         display: grid;
         gap: 0.2rem;
+        min-width: 0;
       }
       .dog-list span {
         color: var(--muted);
@@ -237,6 +269,7 @@ import { BreedService } from '../../services/breed.service';
         display: flex;
         gap: 0.5rem;
         align-items: center;
+        flex-shrink: 0;
       }
       .muted {
         color: var(--muted);
@@ -300,6 +333,12 @@ export class DogsComponent implements OnInit {
 
   protected onBreedInput(event: Event): void {
     this.breedQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onDogPhotos(dogId: number, photos: PhotoItem[]): void {
+    this.dogs.update((list) =>
+      list.map((d) => (d.id === dogId ? { ...d, photos } : d)),
+    );
   }
 
   protected reload(): void {

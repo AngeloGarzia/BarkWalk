@@ -1,8 +1,12 @@
-// Consultation du profil connecté.
+// Consultation du profil connecté + 1 à 3 photos.
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth.service';
 import { Router } from '@angular/router';
+import {
+  PhotoItem,
+  PhotoUploaderComponent,
+} from '../../shared/photo-uploader/photo-uploader.component';
 
 interface UserProfile {
   userId: number;
@@ -15,12 +19,13 @@ interface UserProfile {
   completedWalksCount: number;
   communityOrgStatus: string;
   roles: string[];
+  photos?: PhotoItem[];
 }
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [],
+  imports: [PhotoUploaderComponent],
   template: `
     <div class="profile-page">
       <header class="page-header">
@@ -29,20 +34,34 @@ interface UserProfile {
 
       @if (loading()) {
         <p class="muted">Chargement…</p>
-      } @else if (profile()) {
+      } @else if (profile(); as p) {
         <div class="profile-card">
-          <div class="avatar">{{ initials() }}</div>
+          @if (p.photos?.length) {
+            <img class="avatar-img" [src]="p.photos![0].url" [alt]="p.firstName" />
+          } @else {
+            <div class="avatar">{{ initials() }}</div>
+          }
           <div class="profile-info">
-            <h2>{{ profile()?.firstName }} {{ profile()?.lastName }}</h2>
-            <p class="email">{{ profile()?.email }}</p>
+            <h2>{{ p.firstName }} {{ p.lastName }}</h2>
+            <p class="email">{{ p.email }}</p>
             <div class="roles">
-              @for (role of profile()?.roles ?? []; track role) {
+              @for (role of p.roles ?? []; track role) {
                 <span class="role-badge">{{ role }}</span>
               }
             </div>
-            <p class="muted">Balades terminées : {{ profile()?.completedWalksCount }}</p>
+            <p class="muted">Balades terminées : {{ p.completedWalksCount }}</p>
           </div>
         </div>
+
+        <section class="panel">
+          <app-photo-uploader
+            title="Mes photos"
+            uploadUrl="/api/me/photos"
+            [initialPhotos]="p.photos ?? []"
+            (photosChange)="onPhotosChange($event)"
+          />
+        </section>
+
         <button type="button" class="logout" (click)="logout()">Déconnexion</button>
       } @else if (error()) {
         <p class="banner error" role="alert">{{ error() }}</p>
@@ -70,11 +89,23 @@ interface UserProfile {
         border-radius: var(--radius-md);
         padding: 1.25rem;
         box-shadow: var(--shadow-sm);
+        margin-bottom: 0.85rem;
       }
-      .avatar {
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 1rem 1.1rem;
+        box-shadow: var(--shadow-sm);
+      }
+      .avatar,
+      .avatar-img {
         width: 64px;
         height: 64px;
         border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .avatar {
         background: var(--forest);
         color: var(--on-forest);
         display: grid;
@@ -82,6 +113,10 @@ interface UserProfile {
         font-weight: 800;
         font-family: var(--font-display);
         font-size: 1.2rem;
+      }
+      .avatar-img {
+        object-fit: cover;
+        border: 2px solid var(--forest-soft);
       }
       .email {
         color: var(--muted);
@@ -116,6 +151,12 @@ interface UserProfile {
         font-family: var(--font-display);
         cursor: pointer;
       }
+      .banner.error {
+        background: #fde8e8;
+        color: var(--danger);
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-sm);
+      }
     `,
   ],
 })
@@ -133,6 +174,14 @@ export class ProfileComponent implements OnInit {
     if (!p) return '?';
     return `${p.firstName?.[0] ?? ''}${p.lastName?.[0] ?? ''}`.toUpperCase();
   };
+
+  protected onPhotosChange(photos: PhotoItem[]): void {
+    const current = this.profile();
+    if (!current) {
+      return;
+    }
+    this.profile.set({ ...current, photos });
+  }
 
   protected logout(): void {
     this.auth.logout();

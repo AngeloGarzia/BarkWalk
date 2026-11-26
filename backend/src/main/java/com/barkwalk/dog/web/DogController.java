@@ -1,43 +1,79 @@
 package com.barkwalk.dog.web;
 
-import com.barkwalk.dog.service.DogService;
 import com.barkwalk.dog.dto.DogDtos.DogRequest;
 import com.barkwalk.dog.dto.DogDtos.DogResponse;
 import com.barkwalk.dog.dto.DogDtos.DocumentRequest;
 import com.barkwalk.dog.dto.DogDtos.DocumentResponse;
+import com.barkwalk.dog.dto.DogDtos.PhotoResponse;
+import com.barkwalk.dog.service.DogService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-// API propriétaire pour les chiens.
+// API propriétaire pour les chiens + photos (1–3).
 @RestController
 @RequestMapping("/api/dogs")
 public class DogController {
     private final DogService dogService;
 
-    public DogController(DogService dogService) { this.dogService = dogService; }
+    public DogController(DogService dogService) {
+        this.dogService = dogService;
+    }
 
-    @GetMapping public List<DogResponse> list() { return dogService.myDogs(); }
+    @GetMapping
+    public List<DogResponse> list() {
+        return dogService.myDogs();
+    }
 
-    @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    public DogResponse create(@Valid @RequestBody DogRequest request) { return dogService.create(request); }
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public DogResponse create(@Valid @RequestBody DogRequest request) {
+        return dogService.create(request);
+    }
 
     @PutMapping("/{id}")
     public DogResponse update(@PathVariable Long id, @Valid @RequestBody DogRequest request) {
         return dogService.update(id, request);
     }
 
-    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) { dogService.delete(id); }
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long id) {
+        dogService.delete(id);
+    }
 
     @PostMapping("/{id}/submit")
-    public DogResponse submit(@PathVariable Long id) { return dogService.submit(id); }
+    public DogResponse submit(@PathVariable Long id) {
+        return dogService.submit(id);
+    }
+
+    @GetMapping("/{id}/photos")
+    public List<PhotoResponse> photos(@PathVariable Long id) {
+        return dogService.listPhotos(id);
+    }
+
+    @PostMapping(value = "/{id}/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public PhotoResponse uploadPhoto(@PathVariable Long id, @RequestPart("file") MultipartFile file) {
+        return dogService.uploadPhoto(id, file);
+    }
+
+    @DeleteMapping("/{id}/photos/{photoId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePhoto(@PathVariable Long id, @PathVariable Long photoId) {
+        dogService.deletePhoto(id, photoId);
+    }
 
     @GetMapping("/{id}/documents")
-    public List<DocumentResponse> documents(@PathVariable Long id) { return dogService.documents(id); }
+    public List<DocumentResponse> documents(@PathVariable Long id) {
+        return dogService.documents(id);
+    }
 
-    @PostMapping("/{id}/documents") @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping("/{id}/documents")
+    @ResponseStatus(HttpStatus.CREATED)
     public DocumentResponse addDocument(@PathVariable Long id, @Valid @RequestBody DocumentRequest request) {
         return dogService.addDocument(id, request);
     }

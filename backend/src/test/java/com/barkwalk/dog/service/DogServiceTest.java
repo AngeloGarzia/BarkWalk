@@ -12,6 +12,7 @@ import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.domain.DogDocument;
 import com.barkwalk.dog.repository.DogDocumentRepository;
+import com.barkwalk.dog.repository.DogPhotoRepository;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.dog.dto.DogDtos.DogRequest;
 import com.barkwalk.dog.dto.DogDtos.DocumentRequest;
@@ -39,6 +40,8 @@ class DogServiceTest {
     @Mock
     private DogDocumentRepository documentRepository;
     @Mock
+    private DogPhotoRepository photoRepository;
+    @Mock
     private StorageService storageService;
     @Mock
     private AuditService auditService;
@@ -51,6 +54,9 @@ class DogServiceTest {
     @BeforeEach
     void auth() {
         SecurityTestSupport.authenticate(1L, "owner@example.com", Role.USER);
+        org.mockito.Mockito.lenient()
+                .when(photoRepository.findByDogIdOrderBySortOrderAsc(org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(List.of());
         org.mockito.Mockito.lenient()
                 .doNothing()
                 .when(dogDossierService)
@@ -121,8 +127,7 @@ class DogServiceTest {
         Dog dog = ownedDog(5L, 1L);
         dog.setDossierStatus("PENDING");
         when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
-        org.mockito.Mockito.doThrow(new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "Vaccination and insurance must be validated and not expired"))
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vaccination and insurance must be validated and not expired"))
                 .when(dogDossierService)
                 .assertReadyForAdminValidation(5L);
         assertThatThrownBy(() -> dogService.validate(5L))

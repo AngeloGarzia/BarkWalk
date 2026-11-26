@@ -64,6 +64,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/cities/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/walks/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/memberships/plans").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers("/api/payments/webhook").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
