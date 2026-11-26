@@ -19,7 +19,9 @@ import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
 import com.barkwalk.walk.dto.WalkDtos.WalkResponse;
 import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantResponse;
 import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantsResponse;
+import com.barkwalk.walker.domain.WalkerProfile;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
+import com.barkwalk.walker.service.WalkerPublishEligibility;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +43,7 @@ public class WalkService {
     private final PrivacyService privacyService;
     private final DogRepository dogRepository;
     private final WalkerProfileRepository walkerProfileRepository;
+    private final WalkerPublishEligibility walkerPublishEligibility;
 
     public WalkService(
             WalkRepository walkRepository,
@@ -51,7 +54,8 @@ public class WalkService {
             BusinessSettingsService businessSettingsService,
             PrivacyService privacyService,
             DogRepository dogRepository,
-            WalkerProfileRepository walkerProfileRepository) {
+            WalkerProfileRepository walkerProfileRepository,
+            WalkerPublishEligibility walkerPublishEligibility) {
         this.walkRepository = walkRepository;
         this.meetingPointRepository = meetingPointRepository;
         this.cityRepository = cityRepository;
@@ -61,6 +65,7 @@ public class WalkService {
         this.privacyService = privacyService;
         this.dogRepository = dogRepository;
         this.walkerProfileRepository = walkerProfileRepository;
+        this.walkerPublishEligibility = walkerPublishEligibility;
     }
 
     @Transactional(readOnly = true)
@@ -103,6 +108,15 @@ public class WalkService {
 
         // R11 : communautaire plafonnée par configuration ; encadrée = capacité choisie par admin/indépendant.
         assertCapacityAllowed(request.walkType(), request.capacity());
+
+        // R15 : indépendant — docs + charte avant publication.
+        if ("INDEP_GUIDED".equals(request.walkType()) || roles.contains(Role.WALKER_INDEP)) {
+            WalkerProfile walker = walkerProfileRepository.findByUserId(principal.getId()).orElse(null);
+            if (request.walkerId() != null) {
+                walker = walkerProfileRepository.findById(request.walkerId()).orElse(walker);
+            }
+            walkerPublishEligibility.assertCanPublish(walker);
+        }
 
         Walk walk = new Walk();
         walk.setCityId(request.cityId());

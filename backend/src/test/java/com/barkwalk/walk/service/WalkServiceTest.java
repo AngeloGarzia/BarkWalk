@@ -22,10 +22,12 @@ import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
+import com.barkwalk.walker.service.WalkerPublishEligibility;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -55,9 +57,19 @@ class WalkServiceTest {
     private DogRepository dogRepository;
     @Mock
     private WalkerProfileRepository walkerProfileRepository;
+    @Mock
+    private WalkerPublishEligibility walkerPublishEligibility;
 
     @InjectMocks
     private WalkService walkService;
+
+    @BeforeEach
+    void stubs() {
+        org.mockito.Mockito.lenient()
+                .doNothing()
+                .when(walkerPublishEligibility)
+                .assertCanPublish(org.mockito.ArgumentMatchers.any());
+    }
 
     @AfterEach
     void clear() {
