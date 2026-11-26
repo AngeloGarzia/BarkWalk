@@ -42,7 +42,13 @@ class RoleAccessIT {
 
     @Test
     void adminDashboard_unauthorizedWithoutAuth() throws Exception {
+        // Anonymous → 401 (authenticationEntryPoint), not 403.
         mockMvc.perform(get("/api/admin/dashboard")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void meProfile_unauthorizedWithoutAuth() throws Exception {
+        mockMvc.perform(get("/api/me/profile")).andExpect(status().isUnauthorized());
     }
 
     @Test
