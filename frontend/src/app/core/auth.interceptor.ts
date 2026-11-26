@@ -45,13 +45,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return throwError(() => err);
       }
 
+      // catchError only on refresh — replay errors propagate unchanged (no logout).
       return authService.refreshSession().pipe(
-        switchMap(() => next(withBearer())),
         catchError((refreshErr) => {
           authService.logout();
           void router.navigate(['/login']);
           return throwError(() => refreshErr);
         }),
+        switchMap(() => next(withBearer())),
       );
     }),
   );
