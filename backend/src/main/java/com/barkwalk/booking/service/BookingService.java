@@ -13,9 +13,9 @@ import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
+import com.barkwalk.walk.service.DogWalkCompatibilityService;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,18 +30,21 @@ public class BookingService {
     private final WalkRepository walkRepository;
     private final DogRepository dogRepository;
     private final DogDossierService dogDossierService;
+    private final DogWalkCompatibilityService compatibilityService;
 
     public BookingService(
             BookingRepository bookingRepository,
             WaitlistEntryRepository waitlistEntryRepository,
             WalkRepository walkRepository,
             DogRepository dogRepository,
-            DogDossierService dogDossierService) {
+            DogDossierService dogDossierService,
+            DogWalkCompatibilityService compatibilityService) {
         this.bookingRepository = bookingRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.walkRepository = walkRepository;
         this.dogRepository = dogRepository;
         this.dogDossierService = dogDossierService;
+        this.compatibilityService = compatibilityService;
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
@@ -60,10 +63,8 @@ public class BookingService {
         }
         // R2 / R16 : dossier validé + vaccins/RC non expirés (sinon EXPIRED / refus).
         dogDossierService.assertBookable(dog);
-        if (!contains(walk.getAcceptedSizes(), dog.getSizeCategory())
-                || !contains(walk.getAcceptedEnergy(), dog.getEnergyLevel())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dog incompatible with walk profile");
-        }
+        // R3 : taille / énergie / sociabilité avec motif précis.
+        compatibilityService.assertCompatible(walk, dog);
         if ("COMMUNITY".equals(walk.getWalkType()) && !request.communityAck()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Community disclaimer required");
         }
@@ -151,13 +152,6 @@ public class BookingService {
         booking.setStatus("CONFIRMED");
         booking.setConfirmedAt(Instant.now());
         return toResponse(booking);
-    }
-
-    private boolean contains(String[] values, String value) {
-        if (values == null || value == null) {
-            return false;
-        }
-        return Arrays.stream(values).anyMatch(v -> v != null && v.equalsIgnoreCase(value));
     }
 
     private BookingResponse toResponse(Booking b) {

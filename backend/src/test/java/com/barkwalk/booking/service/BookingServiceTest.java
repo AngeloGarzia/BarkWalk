@@ -18,6 +18,7 @@ import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
+import com.barkwalk.walk.service.DogWalkCompatibilityService;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +44,8 @@ class BookingServiceTest {
     private DogRepository dogRepository;
     @Mock
     private DogDossierService dogDossierService;
+    @Mock
+    private DogWalkCompatibilityService compatibilityService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -51,6 +54,10 @@ class BookingServiceTest {
     void auth() {
         SecurityTestSupport.authenticate(1L, "owner@example.com", Role.USER, Role.MEMBER);
         org.mockito.Mockito.lenient().doNothing().when(dogDossierService).assertBookable(org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.lenient()
+                .doNothing()
+                .when(compatibilityService)
+                .assertCompatible(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @AfterEach
@@ -219,10 +226,16 @@ class BookingServiceTest {
         dog.setSizeCategory("TINY");
         when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
         when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Size TINY not accepted for this walk"))
+                .when(compatibilityService)
+                .assertCompatible(walk, dog);
         assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, false)))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("Size");
+                });
     }
 
     @Test

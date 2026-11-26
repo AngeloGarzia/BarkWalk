@@ -132,6 +132,7 @@ class WalkServiceTest {
         profile.setCompletedWalksCount(10);
         when(profileRepository.findById(5L)).thenReturn(Optional.of(profile));
         when(businessSettingsService.communityWalksThreshold()).thenReturn(3);
+        when(businessSettingsService.communityCapacityMax()).thenReturn(8);
         when(meetingPointRepository.existsById(3L)).thenReturn(true);
         when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> {
             Walk w = inv.getArgument(0);
@@ -145,6 +146,31 @@ class WalkServiceTest {
         var response = walkService.create(createRequest("COMMUNITY"));
         assertThat(response.organizerUserId()).isEqualTo(5L);
         assertThat(response.id()).isEqualTo(77L);
+        assertThat(response.minSociabilityDogs()).isEqualTo("GOOD");
+    }
+
+    @Test
+    void create_community_rejectsCapacityAboveSetting() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
+        Profile profile = new Profile();
+        profile.setCommunityOrgStatus("ACTIVE");
+        when(profileRepository.findById(5L)).thenReturn(Optional.of(profile));
+        when(businessSettingsService.communityWalksThreshold()).thenReturn(3);
+        when(businessSettingsService.communityCapacityMax()).thenReturn(8);
+        when(meetingPointRepository.existsById(3L)).thenReturn(true);
+
+        var req = new WalkCreateRequest(
+                1L, 3L, "COMMUNITY", "Balade test", "desc",
+                Instant.now().plusSeconds(86400), 60, 12, 0, null, null,
+                List.of("LARGE"), List.of("HIGH"), "GOOD", null, true);
+
+        assertThatThrownBy(() -> walkService.create(req))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("Community capacity exceeds max");
+                });
     }
 
     private static WalkCreateRequest createRequest(String type) {

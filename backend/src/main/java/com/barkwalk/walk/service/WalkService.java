@@ -101,6 +101,9 @@ public class WalkService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting point not found");
         }
 
+        // R11 : communautaire plafonnée par configuration ; encadrée = capacité choisie par admin/indépendant.
+        assertCapacityAllowed(request.walkType(), request.capacity());
+
         Walk walk = new Walk();
         walk.setCityId(request.cityId());
         walk.setMeetingPointId(request.meetingPointId());
@@ -151,6 +154,19 @@ public class WalkService {
         return new ParticipantsResponse(walkId, rows);
     }
 
+    private void assertCapacityAllowed(String walkType, int capacity) {
+        if ("COMMUNITY".equals(walkType)) {
+            int max = businessSettingsService.communityCapacityMax();
+            if (capacity > max) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Community capacity exceeds max " + max);
+            }
+        }
+        if (capacity < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Capacity must be >= 1");
+        }
+    }
+
     private void requireStaffForWalk(Walk walk, Long viewerId) {
         var principal = SecurityUtils.currentUser();
         if (principal.getRoles().contains(Role.ADMIN)) {
@@ -198,6 +214,7 @@ public class WalkService {
                 walk.getStatus(),
                 walk.getAcceptedSizes() == null ? List.of() : List.of(walk.getAcceptedSizes()),
                 walk.getAcceptedEnergy() == null ? List.of() : List.of(walk.getAcceptedEnergy()),
+                walk.getMinSociabilityDogs(),
                 walk.getRouteHint(),
                 walk.isCommunityDisclaimerRequired());
     }

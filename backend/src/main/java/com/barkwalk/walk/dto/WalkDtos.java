@@ -33,6 +33,7 @@ public final class WalkDtos {
             String status,
             List<String> acceptedSizes,
             List<String> acceptedEnergy,
+            String minSociabilityDogs,
             String routeHint,
             boolean communityDisclaimerRequired) {}
     public record WalkCreateRequest(
