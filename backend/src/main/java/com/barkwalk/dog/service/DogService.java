@@ -143,6 +143,7 @@ public class DogService {
         }
         short nextOrder = nextSortOrder(dogId);
         StoredImage stored = storageService.storeImage("dogs/" + dogId + "/photos", file);
+        StorageTx.deleteOnRollback(storageService, stored.storageKey());
         DogPhoto photo = new DogPhoto();
         photo.setDogId(dogId);
         photo.setStorageKey(stored.storageKey());

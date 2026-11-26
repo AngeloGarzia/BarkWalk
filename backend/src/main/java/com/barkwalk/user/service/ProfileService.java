@@ -84,6 +84,7 @@ public class ProfileService {
         }
         short nextOrder = nextSortOrder(userId);
         StoredImage stored = storageService.storeImage("profiles/" + userId, file);
+        StorageTx.deleteOnRollback(storageService, stored.storageKey());
         ProfilePhoto photo = new ProfilePhoto();
         photo.setUserId(userId);
         photo.setStorageKey(stored.storageKey());
