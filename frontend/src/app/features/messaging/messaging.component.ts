@@ -513,13 +513,16 @@ export class MessagingComponent implements OnInit {
       case 'WALK':
         return 'Balade';
       case 'DIRECT':
+      case 'PRIVATE':
         return 'Privé';
       case 'SUPPORT':
         return 'Support';
       case 'MODERATION':
         return 'Modération';
+      case 'GROUP':
+        return 'Balade';
       default:
-        return type;
+        return type || 'Conversation';
     }
   }
 

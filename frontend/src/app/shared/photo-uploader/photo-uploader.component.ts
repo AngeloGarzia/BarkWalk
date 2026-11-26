@@ -11,6 +11,7 @@ import {
   signal,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '../../core/auth.service';
 
 export interface PhotoItem {
   id: number;
@@ -271,6 +272,7 @@ export interface PhotoItem {
 })
 export class PhotoUploaderComponent {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
 
   @ViewChild('preview') private previewRef?: ElementRef<HTMLVideoElement>;
@@ -409,18 +411,25 @@ export class PhotoUploaderComponent {
     body.append('file', file, file.name || 'photo.jpg');
     this.uploading.set(true);
     this.error.set(null);
-    this.http.post<PhotoItem>(this.uploadUrl, body).subscribe({
-      next: (photo) => {
-        const next = [...this.photos(), photo].sort((a, b) => a.sortOrder - b.sortOrder);
-        this.photos.set(next);
-        this.photosChange.emit(next);
+    this.auth.ensureFreshAccessToken().subscribe((ok) => {
+      if (!ok) {
         this.uploading.set(false);
-      },
-      error: (err) => {
-        const msg = err?.error?.message || err?.error?.detail || 'Envoi impossible';
-        this.error.set(typeof msg === 'string' ? msg : 'Envoi impossible');
-        this.uploading.set(false);
-      },
+        this.error.set('Session expirée — reconnectez-vous pour envoyer la photo.');
+        return;
+      }
+      this.http.post<PhotoItem>(this.uploadUrl, body).subscribe({
+        next: (photo) => {
+          const next = [...this.photos(), photo].sort((a, b) => a.sortOrder - b.sortOrder);
+          this.photos.set(next);
+          this.photosChange.emit(next);
+          this.uploading.set(false);
+        },
+        error: (err) => {
+          const msg = err?.error?.message || err?.error?.detail || 'Envoi impossible';
+          this.error.set(typeof msg === 'string' ? msg : 'Envoi impossible');
+          this.uploading.set(false);
+        },
+      });
     });
   }
 

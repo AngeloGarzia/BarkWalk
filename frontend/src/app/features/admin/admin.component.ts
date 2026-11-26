@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { energyLabel, sizeLabel, walkStatusLabel } from '../../shared/labels';
 
 interface DashboardStats {
   users: number;
@@ -140,7 +141,10 @@ interface ArchivedWalk {
               <li class="pending-item">
                 <div class="dog-info">
                   <strong>{{ dog.name }}</strong>
-                  <span>{{ dog.breed }} · {{ dog.sizeCategory }} · {{ dog.energyLevel }}</span>
+                  <span
+                    >{{ dog.breed }} · {{ sizeLabel(dog.sizeCategory) }} ·
+                    {{ energyLabel(dog.energyLevel) }}</span
+                  >
                   <span class="dog-detail"
                     >Soc. chiens {{ dog.sociabilityDogs }}
                     @if (dog.dangerCategory) {
@@ -183,7 +187,7 @@ interface ArchivedWalk {
                 <div class="dog-info">
                   <strong>{{ walk.title }}</strong>
                   <span
-                    >{{ walk.status }} · {{ walk.startsAt | date: 'short' }}
+                    >{{ walkStatusLabel(walk.status) }} · {{ walk.startsAt | date: 'short' }}
                     @if (walk.archivedAt) {
                       · archivée {{ walk.archivedAt | date: 'short' }}
                     }
@@ -371,6 +375,9 @@ interface ArchivedWalk {
 })
 export class AdminComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  protected readonly walkStatusLabel = walkStatusLabel;
+  protected readonly sizeLabel = sizeLabel;
+  protected readonly energyLabel = energyLabel;
 
   protected readonly stats = signal<DashboardStats | null>(null);
   protected readonly pendingDogs = signal<PendingDog[]>([]);

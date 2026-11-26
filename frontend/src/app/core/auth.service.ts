@@ -1,7 +1,7 @@
 // État de session côté navigateur : jetons, rôles, login et logout.
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, shareReplay, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { decodeJwtPayload } from './jwt.util';
 
 export interface AuthResponse {
@@ -81,6 +81,45 @@ export class AuthService {
 
   getRefreshToken(): string | null {
     return localStorage.getItem(REFRESH_KEY);
+  }
+
+  /** Milliseconds until access JWT expiry; null if missing/unreadable. */
+  accessTokenTtlMs(): number | null {
+    if (!this._token) {
+      return null;
+    }
+    const payload = decodeJwtPayload(this._token);
+    const exp = payload?.['exp'];
+    if (typeof exp !== 'number' || !Number.isFinite(exp)) {
+      return null;
+    }
+    return exp * 1000 - Date.now();
+  }
+
+  /** True when there is no usable access token or it expires within skewMs. */
+  isAccessExpiringSoon(skewMs = 120_000): boolean {
+    const ttl = this.accessTokenTtlMs();
+    if (ttl == null) {
+      return true;
+    }
+    return ttl <= skewMs;
+  }
+
+  /**
+   * Keeps a short-lived access token usable (e.g. during a multi-hour GPS walk)
+   * without lengthening JWT lifetime: refresh only when close to expiry.
+   */
+  ensureFreshAccessToken(skewMs = 120_000): Observable<boolean> {
+    if (!this.getRefreshToken()) {
+      return of(false);
+    }
+    if (!this.isAccessExpiringSoon(skewMs)) {
+      return of(true);
+    }
+    return this.refreshSession().pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
   }
 
   isLoggedIn(): boolean {

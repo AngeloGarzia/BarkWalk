@@ -36,6 +36,45 @@ public interface WalkRepository extends JpaRepository<Walk, Long> {
     List<Walk> findArchived();
 
     @Query("""
+            SELECT w FROM Walk w
+            WHERE w.archivedAt IS NOT NULL
+              AND (
+                :cityId IS NULL
+                OR w.cityId = :cityId
+                OR EXISTS (
+                  SELECT 1 FROM City cSel, City cWalk
+                  WHERE cSel.id = :cityId
+                    AND cWalk.id = w.cityId
+                    AND lower(cSel.name) = lower(cWalk.name)
+                )
+              )
+            ORDER BY w.archivedAt DESC
+            """)
+    List<Walk> findArchivedFiltered(@Param("cityId") Long cityId);
+
+    /** Admin catalogue : toutes les balades, filtre ville / statut optionnels. */
+    @Query("""
+            SELECT w FROM Walk w
+            WHERE (
+                :cityId IS NULL
+                OR w.cityId = :cityId
+                OR EXISTS (
+                  SELECT 1 FROM City cSel, City cWalk
+                  WHERE cSel.id = :cityId
+                    AND cWalk.id = w.cityId
+                    AND lower(cSel.name) = lower(cWalk.name)
+                )
+              )
+              AND (
+                :status IS NULL
+                OR (:status = 'ARCHIVED' AND w.archivedAt IS NOT NULL)
+                OR (:status <> 'ARCHIVED' AND w.status = :status)
+              )
+            ORDER BY w.startsAt DESC
+            """)
+    List<Walk> findAdminOverview(@Param("cityId") Long cityId, @Param("status") String status);
+
+    @Query("""
         SELECT w FROM Walk w
         WHERE w.walkerId = :walkerId
           AND w.startsAt >= :from

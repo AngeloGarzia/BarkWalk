@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Dog, DogRequest } from '../../models/dog';
 import { BreedService } from '../../services/breed.service';
+import { dossierStatusLabel } from '../../shared/labels';
 import {
   PhotoItem,
   PhotoUploaderComponent,
@@ -21,6 +22,9 @@ import {
           Éditez la fiche librement. Race, taille, énergie, sociabilité, danger et identité
           nécessitent une nouvelle validation admin.
         </p>
+        @if (!formOpen() && !editingId()) {
+          <button type="button" class="btn-add" (click)="openCreate()">Ajouter un chien</button>
+        }
       </header>
 
       @if (error()) {
@@ -30,6 +34,7 @@ import {
         <p class="banner info" role="status">{{ info() }}</p>
       }
 
+      @if (formOpen() || editingId()) {
       <section class="panel">
         <h2>{{ editingId() ? 'Modifier ' + (editingName() || 'le chien') : 'Ajouter un chien' }}</h2>
         <form [formGroup]="form" (ngSubmit)="save()" class="form">
@@ -139,12 +144,11 @@ import {
             <button type="submit" [disabled]="form.invalid || saving()">
               {{ editingId() ? 'Enregistrer les modifications' : 'Enregistrer' }}
             </button>
-            @if (editingId()) {
-              <button type="button" class="btn-ghost" (click)="cancelEdit()">Annuler</button>
-            }
+            <button type="button" class="btn-ghost" (click)="cancelEdit()">Annuler</button>
           </div>
         </form>
       </section>
+      }
 
       <section class="panel">
         <div class="panel-head">
@@ -204,6 +208,9 @@ import {
         margin: 0 auto;
         padding: 1.1rem 1rem 1.5rem;
       }
+      .page-header {
+        margin-bottom: 1.1rem;
+      }
       h1 {
         font-family: var(--font-display);
         margin: 0 0 0.25rem;
@@ -211,8 +218,25 @@ import {
       }
       .subtitle {
         color: var(--muted);
-        margin: 0 0 1.25rem;
+        margin: 0 0 0.85rem;
         font-size: 0.92rem;
+      }
+      .btn-add {
+        display: inline-block;
+        white-space: nowrap;
+        background: var(--forest);
+        color: var(--on-forest);
+        border: none;
+        border-radius: var(--radius-pill);
+        padding: 0.55rem 1.1rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        font-family: var(--font-display);
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+      }
+      .btn-add:hover {
+        filter: brightness(1.05);
       }
       .panel {
         background: var(--surface);
@@ -405,6 +429,8 @@ export class DogsComponent implements OnInit {
   protected readonly breedQuery = signal('');
   protected readonly editingId = signal<number | null>(null);
   protected readonly editingName = signal<string | null>(null);
+  /** Formulaire d’ajout / édition — fermé par défaut. */
+  protected readonly formOpen = signal(false);
   private editingSnapshot: Dog | null = null;
 
   protected readonly filteredBreeds = computed(() => {
@@ -451,20 +477,7 @@ export class DogsComponent implements OnInit {
   }
 
   protected statusLabel(status: string): string {
-    switch (status) {
-      case 'DRAFT':
-        return 'Brouillon';
-      case 'PENDING':
-        return 'En attente admin';
-      case 'VALIDATED':
-        return 'Validé';
-      case 'REFUSED':
-        return 'Refusé';
-      case 'EXPIRED':
-        return 'Expiré';
-      default:
-        return status;
-    }
+    return dossierStatusLabel(status);
   }
 
   protected sizeLabel(size: string): string {
@@ -495,10 +508,22 @@ export class DogsComponent implements OnInit {
     });
   }
 
+  protected openCreate(): void {
+    this.editingId.set(null);
+    this.editingName.set(null);
+    this.editingSnapshot = null;
+    this.resetForm();
+    this.formOpen.set(true);
+    this.error.set(null);
+    this.info.set(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   protected startEdit(dog: Dog): void {
     this.editingId.set(dog.id);
     this.editingName.set(dog.name);
     this.editingSnapshot = dog;
+    this.formOpen.set(true);
     this.info.set(null);
     this.error.set(null);
     this.breedQuery.set(dog.breed);
@@ -523,6 +548,7 @@ export class DogsComponent implements OnInit {
     this.editingId.set(null);
     this.editingName.set(null);
     this.editingSnapshot = null;
+    this.formOpen.set(false);
     this.resetForm();
   }
 

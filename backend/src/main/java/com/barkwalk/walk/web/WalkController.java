@@ -42,6 +42,20 @@ public class WalkController {
         return walkService.mine();
     }
 
+    /** Balades archivées — utilisateurs connectés (filtre ville optionnel). */
+    @GetMapping("/archived")
+    public List<WalkResponse> archivedCatalogue(@RequestParam(required = false) Long cityId) {
+        return walkService.archivedCatalogue(cityId);
+    }
+
+    /** Vue admin : toutes les balades (région/département côté UI). Filtre ville / statut optionnels. */
+    @GetMapping("/admin-overview")
+    public List<WalkResponse> adminOverview(
+            @RequestParam(required = false) Long cityId,
+            @RequestParam(required = false) String status) {
+        return walkService.adminOverview(cityId, status);
+    }
+
     @GetMapping("/{id}")
     public WalkResponse get(@PathVariable Long id) {
         return walkService.get(id);

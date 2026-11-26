@@ -23,6 +23,7 @@ import {
   setWorkerUrl,
 } from 'maplibre-gl';
 import { AuthService } from '../../core/auth.service';
+import { bookingStatusLabel, walkTypeLabel } from '../../shared/labels';
 import { WalkDifficultyBarComponent } from '../../shared/walk-difficulty-bar/walk-difficulty-bar.component';
 
 export interface WalkPin {
@@ -872,14 +873,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected bookingStatusShort(status: string): string {
-    switch (status) {
-      case 'CONFIRMED':
-        return 'Confirmée';
-      case 'PENDING_PAYMENT':
-        return 'Paiement en attente';
-      default:
-        return status;
-    }
+    return bookingStatusLabel(status);
   }
 
   ngAfterViewInit(): void {
@@ -987,14 +981,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected typeLabel(walkType: string): string {
-    const t = (walkType || '').toUpperCase();
-    if (t.includes('COMMUN') || t.includes('OPEN')) {
-      return 'Communautaire · non encadrée';
-    }
-    if (t.includes('GUID') || t.includes('PRO') || t.includes('ENCADR')) {
-      return 'Encadrée';
-    }
-    return walkType || 'Balade';
+    return walkTypeLabel(walkType);
   }
 
   protected typePillClass(walkType: string): string {

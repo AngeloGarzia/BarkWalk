@@ -6,6 +6,13 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { Dog } from '../../models/dog';
+import {
+  bookingStatusLabel,
+  dossierStatusLabel,
+  waitlistStatusLabel,
+  walkStatusLabel,
+  walkTypeLabel,
+} from '../../shared/labels';
 import { WalkDifficultyBarComponent } from '../../shared/walk-difficulty-bar/walk-difficulty-bar.component';
 import {
   PhotoItem,
@@ -225,7 +232,9 @@ interface WalkHistoryPayload {
             }
 
             @if (walk.status !== 'PUBLISHED') {
-              <p class="banner warn">Cette balade n’est plus réservable ({{ walk.status }}).</p>
+              <p class="banner warn">
+                Cette balade n’est plus réservable ({{ walkStatusLabel(walk.status) }}).
+              </p>
             } @else {
               <form class="form" [formGroup]="form" (ngSubmit)="submitBooking()">
                 <label>
@@ -233,7 +242,9 @@ interface WalkHistoryPayload {
                   <select formControlName="dogId">
                     <option value="">Sélectionner…</option>
                     @for (dog of bookableDogs(); track dog.id) {
-                      <option [value]="dog.id">{{ dog.name }} ({{ dog.dossierStatus }})</option>
+                      <option [value]="dog.id">
+                        {{ dog.name }} ({{ dossierStatusLabel(dog.dossierStatus) }})
+                      </option>
                     }
                   </select>
                 </label>
@@ -1014,55 +1025,12 @@ export class BookingComponent implements OnInit {
     return Math.max(0, walk.capacity - walk.bookedCount);
   }
 
-  protected walkTypeLabel(type: string): string {
-    switch (type) {
-      case 'COMMUNITY':
-        return 'Communautaire';
-      case 'STAFF_GUIDED':
-        return 'Encadrée salarié';
-      case 'INDEP_GUIDED':
-        return 'Encadrée indépendant';
-      default:
-        return type;
-    }
-  }
-
+  protected readonly walkTypeLabel = walkTypeLabel;
+  protected readonly walkStatusLabel = walkStatusLabel;
+  protected readonly dossierStatusLabel = dossierStatusLabel;
+  protected readonly waitlistStatusLabel = waitlistStatusLabel;
   protected statusLabel(status: string): string {
-    switch (status) {
-      case 'PENDING_PAYMENT':
-        return 'Paiement en attente';
-      case 'CONFIRMED':
-        return 'Confirmée';
-      case 'CANCELLED_FREE':
-        return 'Annulée (gratuite)';
-      case 'CANCELLED_LATE':
-        return 'Annulée (tardive)';
-      case 'COMPLETED':
-        return 'Terminée';
-      case 'NO_SHOW':
-        return 'Absent';
-      case 'WAITLISTED':
-        return 'Liste d’attente';
-      default:
-        return status;
-    }
-  }
-
-  protected waitlistStatusLabel(status: string): string {
-    switch (status) {
-      case 'WAITING':
-        return 'En attente';
-      case 'OFFERED':
-        return 'Place proposée';
-      case 'ACCEPTED':
-        return 'Acceptée';
-      case 'EXPIRED':
-        return 'Offre expirée';
-      case 'CANCELLED':
-        return 'Annulée';
-      default:
-        return status;
-    }
+    return bookingStatusLabel(status);
   }
 
   protected isCancellable(b: BookingRow): boolean {
@@ -1101,7 +1069,7 @@ export class BookingComponent implements OnInit {
             this.info.set('Réservation confirmée.');
           }
           this.loadBookings();
-          this.loadWalk(walk.id);
+          this.closeWalkTile();
           this.router.navigate(['/booking']);
         },
         error: (err: HttpErrorResponse) => {
@@ -1109,12 +1077,22 @@ export class BookingComponent implements OnInit {
           if (err.status === 409 && this.isWaitlistMessage(err)) {
             this.info.set('Balade complète — vous avez été ajouté à la liste d’attente (R7).');
             this.loadWaitlist();
+            this.closeWalkTile();
             this.router.navigate(['/booking']);
             return;
           }
           this.error.set(this.apiError(err, 'Réservation impossible.'));
         },
       });
+  }
+
+  /** Ferme le panneau de réservation de la balade sélectionnée. */
+  private closeWalkTile(): void {
+    this.walkId.set(null);
+    this.selectedWalk.set(null);
+    this.galleryPhotos.set([]);
+    this.history.set(null);
+    this.walkLoading.set(false);
   }
 
   protected cancelBooking(b: BookingRow): void {

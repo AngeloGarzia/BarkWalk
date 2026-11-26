@@ -130,7 +130,9 @@ export class WalkerTodayComponent implements OnInit {
 
   protected statusLabel(status: string): string {
     const labels: Record<string, string> = {
+      DRAFT: 'Brouillon',
       PUBLISHED: 'Planifiée',
+      IN_PROGRESS: 'En cours',
       COMPLETED: 'Terminée',
       CANCELLED: 'Annulée',
     };

@@ -60,6 +60,7 @@ public class DemoDataInitializer implements ApplicationRunner {
             int elevationGainM,
             String terrainType,
             int capacity,
+            int priceCents,
             int nonMemberPriceCents) {}
 
     private static final List<DemoSpot> FRANCE_SPOTS = List.of(
@@ -78,7 +79,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     40,
                     "PARK",
                     8,
-                    1500),
+                    1200,
+                    1800),
             new DemoSpot(
                     "69001",
                     "Place Bellecour",
@@ -94,6 +96,7 @@ public class DemoDataInitializer implements ApplicationRunner {
                     15,
                     "FLAT",
                     6,
+                    0,
                     0),
             new DemoSpot(
                     "69001",
@@ -110,7 +113,59 @@ public class DemoDataInitializer implements ApplicationRunner {
                     90,
                     "TRAIL",
                     6,
+                    0,
                     0),
+            new DemoSpot(
+                    "69001",
+                    "Parc de la Tête d'Or",
+                    "Boulevard des Belges, 69006 Lyon",
+                    45.781,
+                    4.853,
+                    "Tête d'Or coucher de soleil (archivée)",
+                    "Balade encadrée du soir — terminée et archivée pour tests catalogue.",
+                    "STAFF_GUIDED",
+                    "Tour du lac au crépuscule ~3,5 km",
+                    -8,
+                    55,
+                    35,
+                    "PARK",
+                    8,
+                    1000,
+                    1600),
+            new DemoSpot(
+                    "69001",
+                    "Parc de Gerland",
+                    "Avenue Tony Garnier, 69007 Lyon",
+                    45.7265,
+                    4.8255,
+                    "Gerland canin (archivée)",
+                    "Grande pelouse — édition passée archivée.",
+                    "STAFF_GUIDED",
+                    "Boucle Gerland ~4 km",
+                    -14,
+                    65,
+                    50,
+                    "PARK",
+                    8,
+                    1100,
+                    1700),
+            new DemoSpot(
+                    "69001",
+                    "Quai Saint-Vincent",
+                    "Quai Saint-Vincent, 69001 Lyon",
+                    45.7688,
+                    4.8195,
+                    "Berges Saône indépendant (archivée)",
+                    "Balade indépendante passée — utile pour recyclage / historique.",
+                    "INDEP_GUIDED",
+                    "Berges amont ~3 km",
+                    -21,
+                    50,
+                    40,
+                    "FLAT",
+                    6,
+                    2200,
+                    2200),
             new DemoSpot(
                     "75001",
                     "Jardin des Tuileries",
@@ -126,7 +181,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     25,
                     "PARK",
                     8,
-                    1800),
+                    1400,
+                    2000),
             new DemoSpot(
                     "75011",
                     "Parc des Buttes-Chaumont",
@@ -142,7 +198,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     160,
                     "TRAIL",
                     7,
-                    1800),
+                    1500,
+                    2200),
             new DemoSpot(
                     "13001",
                     "Parc Borély",
@@ -158,7 +215,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     55,
                     "PARK",
                     8,
-                    1600),
+                    1300,
+                    1900),
             new DemoSpot(
                     "31000",
                     "Jardin des Plantes",
@@ -174,7 +232,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     30,
                     "PARK",
                     8,
-                    1400),
+                    1100,
+                    1600),
             new DemoSpot(
                     "33000",
                     "Jardin Public",
@@ -190,7 +249,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     20,
                     "PARK",
                     6,
-                    1500),
+                    1200,
+                    1700),
             new DemoSpot(
                     "44000",
                     "Île de Versailles",
@@ -206,7 +266,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     35,
                     "PARK",
                     7,
-                    1400),
+                    2500,
+                    2500),
             new DemoSpot(
                     "67000",
                     "Parc de l'Orangerie",
@@ -222,7 +283,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     25,
                     "PARK",
                     8,
-                    1500),
+                    1200,
+                    1700),
             new DemoSpot(
                     "59000",
                     "Citadelle de Lille",
@@ -238,7 +300,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     70,
                     "FOREST",
                     8,
-                    1400),
+                    1100,
+                    1600),
             new DemoSpot(
                     "34000",
                     "Place de la Comédie",
@@ -254,6 +317,7 @@ public class DemoDataInitializer implements ApplicationRunner {
                     10,
                     "FLAT",
                     5,
+                    0,
                     0),
             new DemoSpot(
                     "38000",
@@ -270,7 +334,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     220,
                     "MOUNTAIN",
                     7,
-                    1500));
+                    1400,
+                    2000));
 
     private final UserRepository userRepository;
     private final ProfileRepository profileRepository;
@@ -484,7 +549,7 @@ public class DemoDataInitializer implements ApplicationRunner {
             walk.setTerrainType(terrain);
             walk.setDifficultyLevel(difficultyCalculator.compute(spot.durationMinutes(), elevation, terrain));
             walk.setCapacity(spot.capacity());
-            walk.setPriceCents(0);
+            walk.setPriceCents(Math.max(0, spot.priceCents()));
             walk.setNonMemberPriceCents(spot.nonMemberPriceCents() > 0 ? spot.nonMemberPriceCents() : null);
             walk.setRouteHint(spot.routeHint());
             walk.setUpdatedAt(Instant.now());
@@ -528,7 +593,11 @@ public class DemoDataInitializer implements ApplicationRunner {
                 walk.setStartedAt(startsAt);
                 walk.setCompletedAt(end);
                 walk.setArchivedAt(end);
-            } else if (isNew) {
+            } else if (isNew
+                    || walk.getArchivedAt() == null
+                            && !"IN_PROGRESS".equals(walk.getStatus())
+                            && !"COMPLETED".equals(walk.getStatus())
+                            && !"CANCELLED".equals(walk.getStatus())) {
                 walk.setStatus("PUBLISHED");
                 walk.setStartedAt(null);
                 walk.setCompletedAt(null);

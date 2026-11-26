@@ -340,12 +340,51 @@ public class WalkService {
         walkRepository.delete(walk);
     }
 
+    /** Liste admin (toutes villes). */
     @Transactional(readOnly = true)
     public List<WalkResponse> archived() {
         if (!SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         return walkRepository.findArchived().stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * Balades archivées pour utilisateurs connectés.
+     * Admin : toutes les archives (sans filtre ville). Autres : filtre ville / même nom de ville.
+     */
+    @Transactional(readOnly = true)
+    public List<WalkResponse> archivedCatalogue(Long cityId) {
+        SecurityUtils.currentUserId();
+        boolean admin = SecurityUtils.currentUser().getRoles().contains(Role.ADMIN);
+        if (admin) {
+            return walkRepository.findArchived().stream().map(this::toResponse).toList();
+        }
+        return walkRepository.findArchivedFiltered(cityId).stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * Vue admin catalogue : toutes les balades proposées.
+     * Filtres optionnels : ville (ou même nom) et statut (ou {@code ARCHIVED} si soft-archivée).
+     */
+    @Transactional(readOnly = true)
+    public List<WalkResponse> adminOverview(Long cityId, String status) {
+        if (!SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        String normalized = normalizeAdminStatusFilter(status);
+        return walkRepository.findAdminOverview(cityId, normalized).stream().map(this::toResponse).toList();
+    }
+
+    private static String normalizeAdminStatusFilter(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String value = status.trim().toUpperCase();
+        return switch (value) {
+            case "DRAFT", "PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "ARCHIVED" -> value;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown status filter");
+        };
     }
 
     /**
@@ -569,11 +608,13 @@ public class WalkService {
         long booked = bookingRepository.countByWalkIdAndStatusIn(
                 walk.getId(), List.of("CONFIRMED", "PENDING_PAYMENT"));
         MeetingPoint meetingPoint = meetingPointRepository.findById(walk.getMeetingPointId()).orElse(null);
-        String cityName = cityRepository.findById(walk.getCityId()).map(City::getName).orElse(null);
+        City city = cityRepository.findById(walk.getCityId()).orElse(null);
         return new WalkResponse(
                 walk.getId(),
                 walk.getCityId(),
-                cityName,
+                city != null ? city.getName() : null,
+                city != null ? city.getDepartment() : null,
+                city != null ? city.getRegion() : null,
                 walk.getMeetingPointId(),
                 meetingPoint != null ? meetingPoint.getName() : null,
                 meetingPoint != null ? meetingPoint.getAddress() : null,

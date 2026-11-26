@@ -16,6 +16,8 @@ public final class WalkDtos {
             Long id,
             Long cityId,
             String cityName,
+            String department,
+            String region,
             Long meetingPointId,
             String meetingPointName,
             String meetingPointAddress,

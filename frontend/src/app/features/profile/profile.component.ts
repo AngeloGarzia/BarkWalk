@@ -16,6 +16,12 @@ import {
   CommunityWalkModalComponent,
 } from '../../shared/community-walk-modal/community-walk-modal.component';
 import { RouteGeoJson } from '../../shared/route-editor/route-editor.component';
+import {
+  roleLabel,
+  walkStatusLabel,
+  walkTypeLabel,
+  reviewStatusLabel,
+} from '../../shared/labels';
 import { WalkDifficultyBarComponent } from '../../shared/walk-difficulty-bar/walk-difficulty-bar.component';
 
 interface OrganizedWalk {
@@ -114,7 +120,7 @@ interface UserProfile {
             <p class="email">{{ p.email }}</p>
             <div class="roles">
               @for (role of p.roles ?? []; track role) {
-                <span class="role-badge">{{ role }}</span>
+                <span class="role-badge">{{ roleLabel(role) }}</span>
               }
             </div>
             <p class="muted">Balades terminées : {{ p.completedWalksCount }}</p>
@@ -164,7 +170,7 @@ interface UserProfile {
                       {{ walk.cityName || 'Ville' }} · {{ walk.startsAt | date: 'short' }}
                     </p>
                     <div class="tags">
-                      <span class="tag">{{ walk.walkType }}</span>
+                      <span class="tag">{{ walkTypeLabel(walk.walkType) }}</span>
                       @if (walk.organizerDisplayName) {
                         <span class="tag">{{ walk.organizerDisplayName }}</span>
                       }
@@ -176,7 +182,7 @@ interface UserProfile {
                       }
                       <span class="tag">{{ walk.bookedCount }}/{{ walk.capacity }}</span>
                       <span class="tag status-tag" [attr.data-status]="walk.status">{{
-                        walk.status
+                        walkStatusLabel(walk.status)
                       }}</span>
                       @if (walk.archivedAt) {
                         <span class="tag status-tag" data-status="ARCHIVED">Archivée</span>
@@ -716,6 +722,10 @@ export class ProfileComponent implements OnInit {
     return this.auth.isAdmin();
   }
 
+  protected readonly roleLabel = roleLabel;
+  protected readonly walkTypeLabel = walkTypeLabel;
+  protected readonly walkStatusLabel = walkStatusLabel;
+
   protected readonly initials = () => {
     const p = this.profile();
     if (!p) return '?';
@@ -723,16 +733,7 @@ export class ProfileComponent implements OnInit {
   };
 
   protected reviewLabel(status?: string): string {
-    switch (status) {
-      case 'PENDING':
-        return 'En attente admin';
-      case 'REFUSED':
-        return 'Profil refusé';
-      case 'DRAFT':
-        return 'Brouillon';
-      default:
-        return 'Profil validé';
-    }
+    return reviewStatusLabel(status);
   }
 
   protected onPhotosChange(photos: PhotoItem[]): void {

@@ -27,6 +27,7 @@ import {
   RouteLngLat,
   lineLengthMeters,
 } from '../../shared/route-editor/route-editor.component';
+import { AuthService } from '../../core/auth.service';
 import {
   PhotoItem,
   PhotoUploaderComponent,
@@ -440,6 +441,7 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
   @ViewChild('mapContainer', { static: true }) private mapContainer!: ElementRef<HTMLDivElement>;
 
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -471,9 +473,16 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
   private reachedFlags: boolean[] = [];
   private resizeObserver?: ResizeObserver;
   private validatedBannerTimer?: ReturnType<typeof setTimeout>;
+  private authKeepaliveTimer?: ReturnType<typeof setInterval>;
+  private persistTimer?: ReturnType<typeof setTimeout>;
 
   /** Rayon (m) pour valider un point au passage. */
   private static readonly WAYPOINT_RADIUS_M = 60;
+  /** Vérifie le JWT chaque minute ; refresh si < 3 min restantes. */
+  private static readonly AUTH_KEEPALIVE_MS = 60_000;
+  private static readonly AUTH_SKEW_MS = 3 * 60_000;
+  private static readonly TRAIL_STORAGE_PREFIX = 'bw_live_trail_v1_';
+  private static readonly TRAIL_MAX_POINTS = 5_000;
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -486,9 +495,14 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.persistLiveState();
     this.stopGps();
+    this.stopAuthKeepalive();
     if (this.validatedBannerTimer) {
       clearTimeout(this.validatedBannerTimer);
+    }
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
     }
     this.resizeObserver?.disconnect();
     this.gpsMarker?.remove();
@@ -498,7 +512,7 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
   }
 
   protected statusLabel(status: string): string {
-    switch (status) {
+    switch ((status || '').toUpperCase()) {
       case 'PUBLISHED':
         return 'Prête';
       case 'IN_PROGRESS':
@@ -507,8 +521,10 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
         return 'Terminée';
       case 'CANCELLED':
         return 'Annulée';
+      case 'DRAFT':
+        return 'Brouillon';
       default:
-        return status;
+        return status || '—';
     }
   }
 
@@ -530,16 +546,24 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
     }
     this.acting.set(true);
     this.error.set(null);
-    this.http.post<LiveWalk>(`/api/walks/${current.id}/start`, {}).subscribe({
-      next: (updated) => {
+    this.auth.ensureFreshAccessToken(WalkLiveComponent.AUTH_SKEW_MS).subscribe((ok) => {
+      if (!ok) {
         this.acting.set(false);
-        this.applyWalk(updated);
-        this.startGps();
-      },
-      error: (err: HttpErrorResponse) => {
-        this.acting.set(false);
-        this.error.set(this.apiError(err, 'Impossible de démarrer la balade.'));
-      },
+        this.error.set('Session expirée — reconnectez-vous pour démarrer.');
+        void this.router.navigate(['/login']);
+        return;
+      }
+      this.http.post<LiveWalk>(`/api/walks/${current.id}/start`, {}).subscribe({
+        next: (updated) => {
+          this.acting.set(false);
+          this.applyWalk(updated);
+          this.startGps();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.acting.set(false);
+          this.error.set(this.apiError(err, 'Impossible de démarrer la balade.'));
+        },
+      });
     });
   }
 
@@ -550,16 +574,29 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
     }
     this.acting.set(true);
     this.error.set(null);
-    this.http.post<LiveWalk>(`/api/walks/${current.id}/complete`, {}).subscribe({
-      next: (updated) => {
+    this.persistLiveState();
+    this.auth.ensureFreshAccessToken(WalkLiveComponent.AUTH_SKEW_MS).subscribe((ok) => {
+      if (!ok) {
         this.acting.set(false);
-        this.stopGps();
-        this.applyWalk(updated);
-      },
-      error: (err: HttpErrorResponse) => {
-        this.acting.set(false);
-        this.error.set(this.apiError(err, 'Impossible de terminer la balade.'));
-      },
+        this.error.set(
+          'Session expirée — la trace GPS est conservée localement. Reconnectez-vous puis terminez.',
+        );
+        void this.router.navigate(['/login']);
+        return;
+      }
+      this.http.post<LiveWalk>(`/api/walks/${current.id}/complete`, {}).subscribe({
+        next: (updated) => {
+          this.acting.set(false);
+          this.stopGps();
+          this.stopAuthKeepalive();
+          this.clearLiveState(current.id);
+          this.applyWalk(updated);
+        },
+        error: (err: HttpErrorResponse) => {
+          this.acting.set(false);
+          this.error.set(this.apiError(err, 'Impossible de terminer la balade.'));
+        },
+      });
     });
   }
 
@@ -747,6 +784,9 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
   }
 
   private startGps(): void {
+    this.startAuthKeepalive();
+    this.restoreLiveState();
+    this.renderGpsTrail();
     if (this.watchId != null) {
       return;
     }
@@ -790,6 +830,33 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
     }
   }
 
+  private startAuthKeepalive(): void {
+    if (this.authKeepaliveTimer != null) {
+      return;
+    }
+    const tick = () => {
+      this.auth.ensureFreshAccessToken(WalkLiveComponent.AUTH_SKEW_MS).subscribe({
+        next: (ok) => {
+          if (!ok) {
+            this.persistLiveState();
+            this.geoError.set(
+              'Session bientôt expirée — reconnectez-vous : la trace GPS est sauvegardée localement.',
+            );
+          }
+        },
+      });
+    };
+    tick();
+    this.authKeepaliveTimer = setInterval(tick, WalkLiveComponent.AUTH_KEEPALIVE_MS);
+  }
+
+  private stopAuthKeepalive(): void {
+    if (this.authKeepaliveTimer != null) {
+      clearInterval(this.authKeepaliveTimer);
+      this.authKeepaliveTimer = undefined;
+    }
+  }
+
   private onGps(pos: GeolocationPosition): void {
     const lng = pos.coords.longitude;
     const lat = pos.coords.latitude;
@@ -800,21 +867,32 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
     const last = this.trail[this.trail.length - 1];
     if (!last || haversineMeters(last, point) >= 4) {
       this.trail.push(point);
+      if (this.trail.length > WalkLiveComponent.TRAIL_MAX_POINTS) {
+        this.trail.splice(0, this.trail.length - WalkLiveComponent.TRAIL_MAX_POINTS);
+      }
+      this.schedulePersistLiveState();
     }
     this.trailMeters.set(lineLengthMeters(this.trail));
     this.updateWaypointProgress(point);
     this.geoError.set(null);
+    this.renderGpsTrail(point);
+  }
 
+  private renderGpsTrail(center?: RouteLngLat): void {
     const map = this.map;
     if (!map || !this.mapReady) {
       return;
     }
-    if (!this.gpsMarker) {
-      const el = document.createElement('div');
-      el.className = 'bw-live-dot';
-      this.gpsMarker = new Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
-    } else {
-      this.gpsMarker.setLngLat([lng, lat]);
+    if (center) {
+      const [lng, lat] = center;
+      if (!this.gpsMarker) {
+        const el = document.createElement('div');
+        el.className = 'bw-live-dot';
+        this.gpsMarker = new Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+      } else {
+        this.gpsMarker.setLngLat([lng, lat]);
+      }
+      map.easeTo({ center: [lng, lat], duration: 600 });
     }
 
     const trailSource = map.getSource('gps-trail') as GeoJSONSource | undefined;
@@ -827,8 +905,77 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
           }
         : emptyLine(),
     );
+  }
 
-    map.easeTo({ center: [lng, lat], duration: 600 });
+  private trailStorageKey(walkId: number): string {
+    return `${WalkLiveComponent.TRAIL_STORAGE_PREFIX}${walkId}`;
+  }
+
+  private schedulePersistLiveState(): void {
+    if (this.persistTimer) {
+      return;
+    }
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = undefined;
+      this.persistLiveState();
+    }, 2_000);
+  }
+
+  private persistLiveState(): void {
+    const walk = this.walk();
+    if (!walk || walk.status !== 'IN_PROGRESS') {
+      return;
+    }
+    try {
+      const payload: LiveTrailBuffer = {
+        walkId: walk.id,
+        trail: this.trail,
+        reachedFlags: this.reachedFlags,
+        savedAt: Date.now(),
+      };
+      sessionStorage.setItem(this.trailStorageKey(walk.id), JSON.stringify(payload));
+    } catch {
+      // Quota / private mode — ignore.
+    }
+  }
+
+  private restoreLiveState(): void {
+    const walk = this.walk();
+    if (!walk || walk.status !== 'IN_PROGRESS' || this.trail.length > 0) {
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(this.trailStorageKey(walk.id));
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw) as LiveTrailBuffer;
+      if (parsed.walkId !== walk.id || !Array.isArray(parsed.trail)) {
+        return;
+      }
+      this.trail = parsed.trail.filter(
+        (c): c is RouteLngLat =>
+          Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1]),
+      );
+      if (
+        Array.isArray(parsed.reachedFlags) &&
+        parsed.reachedFlags.length === this.plannedRoute.length
+      ) {
+        this.reachedFlags = parsed.reachedFlags.map(Boolean);
+        this.syncWaypointViews();
+      }
+      this.trailMeters.set(lineLengthMeters(this.trail));
+    } catch {
+      // Ignore corrupt buffer.
+    }
+  }
+
+  private clearLiveState(walkId: number): void {
+    try {
+      sessionStorage.removeItem(this.trailStorageKey(walkId));
+    } catch {
+      // ignore
+    }
   }
 
   private updateWaypointProgress(point: RouteLngLat): void {
@@ -855,6 +1002,7 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
           : `Points ${labels} validés`,
       );
       this.syncWaypointViews();
+      this.schedulePersistLiveState();
       return;
     }
     this.applyWaypointMarkerStyles();
@@ -1013,6 +1161,13 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
 interface WaypointView {
   index: number;
   reached: boolean;
+}
+
+interface LiveTrailBuffer {
+  walkId: number;
+  trail: RouteLngLat[];
+  reachedFlags: boolean[];
+  savedAt: number;
 }
 
 function parseCoordinates(raw: LiveWalk['routeGeojson']): RouteLngLat[] {
