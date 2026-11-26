@@ -58,6 +58,8 @@ class BookingServiceTest {
     private NotificationService notificationService;
     @Mock
     private WalkerProfileRepository walkerProfileRepository;
+    @Mock
+    private WaitlistService waitlistService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -72,6 +74,7 @@ class BookingServiceTest {
                 .assertCompatible(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         org.mockito.Mockito.lenient().when(businessSettingsService.pendingPaymentMinutes()).thenReturn(15);
         org.mockito.Mockito.lenient().when(businessSettingsService.cancellationFreeHours()).thenReturn(24);
+        org.mockito.Mockito.lenient().doNothing().when(waitlistService).offerNext(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @AfterEach

@@ -22,6 +22,7 @@ import com.barkwalk.walker.repository.WalkerProfileRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class BookingService {
     private final PaymentRepository paymentRepository;
     private final NotificationService notificationService;
     private final WalkerProfileRepository walkerProfileRepository;
+    private final WaitlistService waitlistService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -51,7 +53,8 @@ public class BookingService {
             BusinessSettingsService businessSettingsService,
             PaymentRepository paymentRepository,
             NotificationService notificationService,
-            WalkerProfileRepository walkerProfileRepository) {
+            WalkerProfileRepository walkerProfileRepository,
+            @Lazy WaitlistService waitlistService) {
         this.bookingRepository = bookingRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.walkRepository = walkRepository;
@@ -62,6 +65,7 @@ public class BookingService {
         this.paymentRepository = paymentRepository;
         this.notificationService = notificationService;
         this.walkerProfileRepository = walkerProfileRepository;
+        this.waitlistService = waitlistService;
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
@@ -182,6 +186,7 @@ public class BookingService {
             booking.setCountsTowardOrgThreshold(true);
             booking.setCountsTowardMembershipQuota(true);
         }
+        waitlistService.offerNext(walk.getId());
         return toResponse(booking);
     }
 
@@ -202,6 +207,7 @@ public class BookingService {
         booking.setCountsTowardMembershipQuota(false);
         refundFully(booking, reason != null ? reason : "cancelled_by_staff");
         notificationService.notifyWalkCancelledByStaff(walk.getId(), booking.getUserId(), reason);
+        waitlistService.offerNext(walk.getId());
         return toResponse(booking);
     }
 
@@ -267,6 +273,7 @@ public class BookingService {
             booking.setCancelledByRole("SYSTEM");
             booking.setCancellationReason("payment_expired");
             bookingRepository.save(booking);
+            waitlistService.offerNext(booking.getWalkId());
             count++;
         }
         return count;
