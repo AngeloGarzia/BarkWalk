@@ -11,25 +11,30 @@ import com.barkwalk.common.AuditService;
 import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.domain.DogDocument;
+import com.barkwalk.dog.domain.DogPhoto;
 import com.barkwalk.dog.repository.DogDocumentRepository;
 import com.barkwalk.dog.repository.DogPhotoRepository;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.dog.dto.DogDtos.DogRequest;
 import com.barkwalk.dog.dto.DogDtos.DocumentRequest;
 import com.barkwalk.storage.StorageService;
+import com.barkwalk.storage.StoredImage;
 import com.barkwalk.support.SecurityTestSupport;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -202,6 +207,87 @@ class DogServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void uploadPhoto_storesImageForOwner() {
+        Dog dog = ownedDog(5L, 1L);
+        when(dogRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(dog));
+        when(photoRepository.countByDogId(5L)).thenReturn(0L);
+        when(storageService.storeImage(eq("dogs/5/photos"), any()))
+                .thenReturn(new StoredImage("dogs/5/photos/a.jpg", "image/jpeg"));
+        DogPhoto[] saved = new DogPhoto[1];
+        when(photoRepository.save(any(DogPhoto.class))).thenAnswer(inv -> {
+            DogPhoto p = inv.getArgument(0);
+            setId(p, 40L);
+            saved[0] = p;
+            return p;
+        });
+        when(photoRepository.findByDogIdOrderBySortOrderAsc(5L))
+                .thenReturn(List.of())
+                .thenAnswer(inv -> List.of(saved[0]));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        when(storageService.publicMediaUrl("dogs/5/photos/a.jpg")).thenReturn("/api/media/dogs/5/photos/a.jpg?exp=1&sig=x");
+
+        var response = dogService.uploadPhoto(
+                5L, new MockMultipartFile("file", "a.jpg", "text/plain", new byte[] {1, 2, 3}));
+
+        assertThat(response.id()).isEqualTo(40L);
+        assertThat(response.sortOrder()).isEqualTo((short) 0);
+        assertThat(dog.getPhotoKey()).isEqualTo("dogs/5/photos/a.jpg");
+    }
+
+    @Test
+    void uploadPhoto_rejectsFourthPhoto() {
+        Dog dog = ownedDog(5L, 1L);
+        when(dogRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(dog));
+        when(photoRepository.countByDogId(5L)).thenReturn(3L);
+        assertThatThrownBy(() -> dogService.uploadPhoto(
+                        5L, new MockMultipartFile("file", "a.jpg", "image/jpeg", new byte[] {1})))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void uploadPhoto_forbiddenForNonOwner() {
+        Dog dog = ownedDog(5L, 99L);
+        when(dogRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(dog));
+        assertThatThrownBy(() -> dogService.uploadPhoto(
+                        5L, new MockMultipartFile("file", "a.jpg", "image/jpeg", new byte[] {1})))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void deletePhoto_reindexesRemaining() {
+        Dog dog = ownedDog(5L, 1L);
+        DogPhoto keep = dogPhoto(2L, 5L, "dogs/5/photos/b.jpg", (short) 1);
+        DogPhoto remove = dogPhoto(1L, 5L, "dogs/5/photos/a.jpg", (short) 0);
+        when(dogRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(dog));
+        when(photoRepository.findByIdAndDogId(1L, 5L)).thenReturn(Optional.of(remove));
+        when(photoRepository.findByDogIdOrderBySortOrderAsc(5L))
+                .thenReturn(new ArrayList<>(List.of(keep)))
+                .thenReturn(List.of(keep));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+
+        dogService.deletePhoto(5L, 1L);
+
+        ArgumentCaptor<List<DogPhoto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(photoRepository).saveAll(captor.capture());
+        assertThat(captor.getValue().getFirst().getSortOrder()).isEqualTo((short) 0);
+        assertThat(dog.getPhotoKey()).isEqualTo("dogs/5/photos/b.jpg");
+    }
+
+    private static DogPhoto dogPhoto(long id, long dogId, String key, short order) {
+        DogPhoto p = new DogPhoto();
+        setId(p, id);
+        p.setDogId(dogId);
+        p.setStorageKey(key);
+        p.setContentType("image/jpeg");
+        p.setSortOrder(order);
+        return p;
     }
 
     private static DogRequest sampleRequest() {

@@ -142,7 +142,7 @@ public class StorageService {
         return signedGetUrl(storageKey) + "&method=PUT";
     }
 
-    String sign(String storageKey, long exp) {
+    public String sign(String storageKey, long exp) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(signingSecret, "HmacSHA256"));
