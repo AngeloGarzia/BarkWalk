@@ -14,6 +14,7 @@ import com.barkwalk.booking.dto.BookingDtos.BookingRequest;
 import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
@@ -46,6 +47,8 @@ class BookingServiceTest {
     private DogDossierService dogDossierService;
     @Mock
     private DogWalkCompatibilityService compatibilityService;
+    @Mock
+    private BusinessSettingsService businessSettingsService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -58,6 +61,7 @@ class BookingServiceTest {
                 .doNothing()
                 .when(compatibilityService)
                 .assertCompatible(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.lenient().when(businessSettingsService.pendingPaymentMinutes()).thenReturn(15);
     }
 
     @AfterEach
@@ -302,6 +306,41 @@ class BookingServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void create_rejectsSecondTrial() {
+        Walk walk = staffWalk(10L, 8);
+        Dog dog = validatedDog(5L, 1L);
+        when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        when(bookingRepository.existsByUserIdAndTrialTrue(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, true)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(rse.getReason()).contains("Free trial already used");
+                });
+    }
+
+    @Test
+    void create_rejectsTrialOnIndepWalk() {
+        Walk walk = staffWalk(10L, 8);
+        walk.setWalkType("INDEP_GUIDED");
+        walk.setPriceCents(2000);
+        Dog dog = validatedDog(5L, 1L);
+        when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+
+        assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, true)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("staff-guided");
+                });
     }
 
     @Test

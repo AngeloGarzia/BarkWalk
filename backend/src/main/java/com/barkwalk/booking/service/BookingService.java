@@ -4,6 +4,7 @@ import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.domain.WaitlistEntry;
 import com.barkwalk.booking.dto.BookingDtos.BookingRequest;
 import com.barkwalk.booking.dto.BookingDtos.BookingResponse;
+import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
 import com.barkwalk.common.Role;
@@ -31,6 +32,7 @@ public class BookingService {
     private final DogRepository dogRepository;
     private final DogDossierService dogDossierService;
     private final DogWalkCompatibilityService compatibilityService;
+    private final BusinessSettingsService businessSettingsService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -38,13 +40,15 @@ public class BookingService {
             WalkRepository walkRepository,
             DogRepository dogRepository,
             DogDossierService dogDossierService,
-            DogWalkCompatibilityService compatibilityService) {
+            DogWalkCompatibilityService compatibilityService,
+            BusinessSettingsService businessSettingsService) {
         this.bookingRepository = bookingRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.walkRepository = walkRepository;
         this.dogRepository = dogRepository;
         this.dogDossierService = dogDossierService;
         this.compatibilityService = compatibilityService;
+        this.businessSettingsService = businessSettingsService;
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
@@ -72,6 +76,18 @@ public class BookingService {
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Membership required");
         }
+        // R1 : essai gratuit = 1 par compte, uniquement balade encadrée salarié.
+        boolean trial = request.trial();
+        if (trial) {
+            if (!"STAFF_GUIDED".equals(walk.getWalkType())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Free trial only on staff-guided walks");
+            }
+            if (bookingRepository.existsByUserIdAndTrialTrue(userId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Free trial already used");
+            }
+        }
+
         if (bookingRepository.existsByWalkIdAndDogIdAndStatusNotIn(
                 walk.getId(), dog.getId(), List.of("CANCELLED_FREE", "CANCELLED_LATE"))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already booked");
@@ -97,7 +113,7 @@ public class BookingService {
         if ("INDEP_GUIDED".equals(walk.getWalkType())) {
             price = walk.getPriceCents();
             paymentRequired = price > 0;
-        } else if ("STAFF_GUIDED".equals(walk.getWalkType()) && !member && !request.trial()) {
+        } else if ("STAFF_GUIDED".equals(walk.getWalkType()) && !member && !trial) {
             price = walk.getNonMemberPriceCents() != null ? walk.getNonMemberPriceCents() : walk.getPriceCents();
             paymentRequired = price > 0;
         }
@@ -107,13 +123,13 @@ public class BookingService {
         booking.setUserId(userId);
         booking.setDogId(dog.getId());
         booking.setCommunityAck(request.communityAck());
-        booking.setTrial(request.trial());
+        booking.setTrial(trial);
         booking.setPriceCents(price);
         booking.setPaymentRequired(paymentRequired);
         if (paymentRequired) {
             booking.setStatus("PENDING_PAYMENT");
-            // Place libérable après 15 minutes sans paiement (job / libération R6).
-            booking.setPaymentExpiresAt(Instant.now().plus(Duration.ofMinutes(15)));
+            int minutes = businessSettingsService.pendingPaymentMinutes();
+            booking.setPaymentExpiresAt(Instant.now().plus(Duration.ofMinutes(minutes)));
         } else {
             booking.setStatus("CONFIRMED");
             booking.setConfirmedAt(Instant.now());

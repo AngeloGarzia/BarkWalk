@@ -23,4 +23,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByDogId(Long dogId);
 
     boolean existsByWalkIdAndDogIdAndStatusNotIn(Long walkId, Long dogId, Collection<String> statuses);
+
+    boolean existsByUserIdAndTrialTrue(Long userId);
+
+    List<Booking> findByStatusAndPaymentExpiresAtBefore(String status, Instant before);
 }
