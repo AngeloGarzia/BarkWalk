@@ -161,13 +161,36 @@ public class BookingService {
         return toResponse(booking);
     }
 
+    /** Confirmation serveur uniquement (webhook) — idempotente. */
     @Transactional
     public BookingResponse confirmPayment(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if ("CONFIRMED".equals(booking.getStatus())) {
+            return toResponse(booking);
+        }
+        if (!"PENDING_PAYMENT".equals(booking.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking not awaiting payment");
+        }
         booking.setStatus("CONFIRMED");
         booking.setConfirmedAt(Instant.now());
         return toResponse(booking);
+    }
+
+    /** R6 : libère les places PENDING_PAYMENT dont payment_expires_at est dépassé. */
+    @Transactional
+    public int expireUnpaidBookings() {
+        Instant now = Instant.now();
+        int count = 0;
+        for (Booking booking : bookingRepository.findByStatusAndPaymentExpiresAtBefore("PENDING_PAYMENT", now)) {
+            booking.setStatus("CANCELLED_FREE");
+            booking.setCancelledAt(now);
+            booking.setCancelledByRole("SYSTEM");
+            booking.setCancellationReason("payment_expired");
+            bookingRepository.save(booking);
+            count++;
+        }
+        return count;
     }
 
     private BookingResponse toResponse(Booking b) {

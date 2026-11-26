@@ -166,6 +166,32 @@ class BookingServiceTest {
     }
 
     @Test
+    void confirmPayment_isIdempotentWhenAlreadyConfirmed() {
+        Booking booking = new Booking();
+        booking.setStatus("CONFIRMED");
+        booking.setConfirmedAt(java.time.Instant.parse("2026-01-01T10:00:00Z"));
+        when(bookingRepository.findById(8L)).thenReturn(Optional.of(booking));
+        var response = bookingService.confirmPayment(8L);
+        assertThat(response.status()).isEqualTo("CONFIRMED");
+        assertThat(booking.getConfirmedAt()).isEqualTo(java.time.Instant.parse("2026-01-01T10:00:00Z"));
+    }
+
+    @Test
+    void expireUnpaidBookings_releasesPlace() {
+        Booking booking = new Booking();
+        booking.setStatus("PENDING_PAYMENT");
+        booking.setPaymentExpiresAt(java.time.Instant.now().minusSeconds(60));
+        when(bookingRepository.findByStatusAndPaymentExpiresAtBefore(
+                        org.mockito.ArgumentMatchers.eq("PENDING_PAYMENT"), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(booking));
+        when(bookingRepository.save(booking)).thenReturn(booking);
+
+        assertThat(bookingService.expireUnpaidBookings()).isEqualTo(1);
+        assertThat(booking.getStatus()).isEqualTo("CANCELLED_FREE");
+        assertThat(booking.getCancellationReason()).isEqualTo("payment_expired");
+    }
+
+    @Test
     void mine_delegatesToRepository() {
         when(bookingRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
         assertThat(bookingService.mine()).isEmpty();

@@ -1,5 +1,7 @@
 package com.barkwalk.payment.service;
 
+import com.barkwalk.booking.domain.Booking;
+import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.service.BookingService;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.payment.domain.Payment;
@@ -8,6 +10,8 @@ import com.barkwalk.payment.dto.PaymentDtos.PaymentResponse;
 import com.barkwalk.payment.dto.PaymentDtos.WebhookAck;
 import com.barkwalk.payment.repository.PaymentRepository;
 import com.barkwalk.payment.repository.WebhookEventRepository;
+import com.barkwalk.walk.domain.Walk;
+import com.barkwalk.walk.repository.WalkRepository;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,17 +24,26 @@ import org.springframework.web.server.ResponseStatusException;
 public class PaymentService {
     private final WebhookEventRepository webhookEventRepository;
     private final PaymentRepository paymentRepository;
+    private final BookingRepository bookingRepository;
+    private final WalkRepository walkRepository;
     private final BookingService bookingService;
+    private final CommissionCalculator commissionCalculator;
     private final String webhookSecret;
 
     public PaymentService(
             WebhookEventRepository webhookEventRepository,
             PaymentRepository paymentRepository,
+            BookingRepository bookingRepository,
+            WalkRepository walkRepository,
             BookingService bookingService,
+            CommissionCalculator commissionCalculator,
             @Value("${barkwalk.stripe.webhook-secret:}") String webhookSecret) {
         this.webhookEventRepository = webhookEventRepository;
         this.paymentRepository = paymentRepository;
+        this.bookingRepository = bookingRepository;
+        this.walkRepository = walkRepository;
         this.bookingService = bookingService;
+        this.commissionCalculator = commissionCalculator;
         this.webhookSecret = webhookSecret;
     }
 
@@ -56,11 +69,41 @@ public class PaymentService {
             if (object instanceof Map<?, ?> obj) {
                 Object bookingId = obj.get("booking_id");
                 if (bookingId != null) {
-                    bookingService.confirmPayment(Long.valueOf(bookingId.toString()));
+                    Long id = Long.valueOf(bookingId.toString());
+                    // Confirmation uniquement côté serveur ; jamais via retour navigateur.
+                    bookingService.confirmPayment(id);
+                    recordBookingPayment(id, obj);
                 }
             }
         }
         return new WebhookAck("ok");
+    }
+
+    private void recordBookingPayment(Long bookingId, Map<?, ?> stripeObject) {
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking == null || booking.getPriceCents() <= 0) {
+            return;
+        }
+        if (paymentRepository.findByBookingId(bookingId).isPresent()) {
+            return;
+        }
+        int commission = 0;
+        Walk walk = walkRepository.findById(booking.getWalkId()).orElse(null);
+        if (walk != null && "INDEP_GUIDED".equals(walk.getWalkType())) {
+            commission = commissionCalculator.commissionCents(booking.getPriceCents());
+        }
+        Payment payment = new Payment();
+        payment.setUserId(booking.getUserId());
+        payment.setBookingId(bookingId);
+        payment.setAmountCents(booking.getPriceCents());
+        payment.setPaymentType("BOOKING");
+        payment.setStatus("SUCCEEDED");
+        Object intent = stripeObject.get("id");
+        if (intent != null) {
+            payment.setStripePaymentIntent(intent.toString());
+        }
+        payment.setCommissionCents(commission);
+        paymentRepository.save(payment);
     }
 
     @Transactional(readOnly = true)
