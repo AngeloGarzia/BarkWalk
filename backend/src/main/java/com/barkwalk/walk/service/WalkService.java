@@ -1,9 +1,12 @@
 package com.barkwalk.walk.service;
 
 import com.barkwalk.admin.service.BusinessSettingsService;
+import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
+import com.barkwalk.common.PrivacyService;
 import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
+import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.repository.ProfileRepository;
 import com.barkwalk.city.domain.City;
@@ -14,7 +17,11 @@ import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
 import com.barkwalk.walk.dto.WalkDtos.WalkResponse;
+import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantResponse;
+import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantsResponse;
+import com.barkwalk.walker.repository.WalkerProfileRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
@@ -31,6 +38,9 @@ public class WalkService {
     private final BookingRepository bookingRepository;
     private final ProfileRepository profileRepository;
     private final BusinessSettingsService businessSettingsService;
+    private final PrivacyService privacyService;
+    private final DogRepository dogRepository;
+    private final WalkerProfileRepository walkerProfileRepository;
 
     public WalkService(
             WalkRepository walkRepository,
@@ -38,13 +48,19 @@ public class WalkService {
             CityRepository cityRepository,
             BookingRepository bookingRepository,
             ProfileRepository profileRepository,
-            BusinessSettingsService businessSettingsService) {
+            BusinessSettingsService businessSettingsService,
+            PrivacyService privacyService,
+            DogRepository dogRepository,
+            WalkerProfileRepository walkerProfileRepository) {
         this.walkRepository = walkRepository;
         this.meetingPointRepository = meetingPointRepository;
         this.cityRepository = cityRepository;
         this.bookingRepository = bookingRepository;
         this.profileRepository = profileRepository;
         this.businessSettingsService = businessSettingsService;
+        this.privacyService = privacyService;
+        this.dogRepository = dogRepository;
+        this.walkerProfileRepository = walkerProfileRepository;
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +122,52 @@ public class WalkService {
         walk.setRouteHint(request.routeHint());
         walk.setStatus("PUBLISHED");
         return toResponse(walkRepository.save(walk));
+    }
+
+    // Liste des inscrits : réservée à l'encadrant / organisateur / admin (téléphone conditionnel).
+    @Transactional(readOnly = true)
+    public ParticipantsResponse participants(Long walkId) {
+        Walk walk = walkRepository.findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Long viewerId = SecurityUtils.currentUserId();
+        requireStaffForWalk(walk, viewerId);
+
+        List<ParticipantResponse> rows = new ArrayList<>();
+        for (Booking booking : bookingRepository.findByWalkId(walkId)) {
+            if (!List.of("CONFIRMED", "PENDING_PAYMENT", "COMPLETED").contains(booking.getStatus())) {
+                continue;
+            }
+            String dogName = dogRepository.findById(booking.getDogId()).map(d -> d.getName()).orElse("?");
+            String phone = privacyService.phoneForViewer(viewerId, booking.getUserId(), walkId);
+            rows.add(new ParticipantResponse(
+                    booking.getId(),
+                    booking.getUserId(),
+                    booking.getDogId(),
+                    privacyService.displayName(booking.getUserId()),
+                    dogName,
+                    booking.getStatus(),
+                    phone));
+        }
+        return new ParticipantsResponse(walkId, rows);
+    }
+
+    private void requireStaffForWalk(Walk walk, Long viewerId) {
+        var principal = SecurityUtils.currentUser();
+        if (principal.getRoles().contains(Role.ADMIN)) {
+            return;
+        }
+        if (walk.getOrganizerUserId() != null && walk.getOrganizerUserId().equals(viewerId)) {
+            return;
+        }
+        if (walk.getWalkerId() != null) {
+            boolean isAssignedWalker = walkerProfileRepository.findByUserId(viewerId)
+                    .map(wp -> walk.getWalkerId().equals(wp.getId()))
+                    .orElse(false);
+            if (isAssignedWalker) {
+                return;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only walk staff can list participants");
     }
 
     private WalkResponse toResponse(Walk walk) {

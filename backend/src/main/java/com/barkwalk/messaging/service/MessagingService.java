@@ -1,5 +1,6 @@
 package com.barkwalk.messaging.service;
 
+import com.barkwalk.common.PrivacyService;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.messaging.domain.Conversation;
 import com.barkwalk.messaging.domain.ConversationMember;
@@ -26,16 +27,19 @@ public class MessagingService {
     private final ConversationMemberRepository memberRepository;
     private final MessageRepository messageRepository;
     private final UserBlockRepository blockRepository;
+    private final PrivacyService privacyService;
 
     public MessagingService(
             ConversationRepository conversationRepository,
             ConversationMemberRepository memberRepository,
             MessageRepository messageRepository,
-            UserBlockRepository blockRepository) {
+            UserBlockRepository blockRepository,
+            PrivacyService privacyService) {
         this.conversationRepository = conversationRepository;
         this.memberRepository = memberRepository;
         this.messageRepository = messageRepository;
         this.blockRepository = blockRepository;
+        this.privacyService = privacyService;
     }
 
     @Transactional(readOnly = true)
@@ -106,6 +110,12 @@ public class MessagingService {
 
     private MessageResponse toMessage(Message m) {
         return new MessageResponse(
-                m.getId(), m.getConversationId(), m.getSenderId(), m.getBody(), m.getCreatedAt(), m.getReadAt());
+                m.getId(),
+                m.getConversationId(),
+                m.getSenderId(),
+                privacyService.displayName(m.getSenderId()),
+                m.getBody(),
+                m.getCreatedAt(),
+                m.getReadAt());
     }
 }

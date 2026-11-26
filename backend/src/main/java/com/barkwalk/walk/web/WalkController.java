@@ -1,8 +1,9 @@
 package com.barkwalk.walk.web;
 
-import com.barkwalk.walk.service.WalkService;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
 import com.barkwalk.walk.dto.WalkDtos.WalkResponse;
+import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantsResponse;
+import com.barkwalk.walk.service.WalkService;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.*;
 public class WalkController {
     private final WalkService walkService;
 
-    public WalkController(WalkService walkService) { this.walkService = walkService; }
+    public WalkController(WalkService walkService) {
+        this.walkService = walkService;
+    }
 
     @GetMapping
     public List<WalkResponse> catalogue(
@@ -26,9 +29,17 @@ public class WalkController {
     }
 
     @GetMapping("/{id}")
-    public WalkResponse get(@PathVariable Long id) { return walkService.get(id); }
+    public WalkResponse get(@PathVariable Long id) {
+        return walkService.get(id);
+    }
 
-    @PostMapping @ResponseStatus(HttpStatus.CREATED)
+    @GetMapping("/{id}/participants")
+    public ParticipantsResponse participants(@PathVariable Long id) {
+        return walkService.participants(id);
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public WalkResponse create(@Valid @RequestBody WalkCreateRequest request) {
         return walkService.create(request);
     }

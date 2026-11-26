@@ -14,5 +14,12 @@ public final class MessagingDtos {
 
     public record ConversationResponse(Long id, String conversationType, Long walkId, Instant createdAt, Instant archivedAt) {}
 
-    public record MessageResponse(Long id, Long conversationId, Long senderId, String body, Instant createdAt, Instant readAt) {}
+    public record MessageResponse(
+            Long id,
+            Long conversationId,
+            Long senderId,
+            String senderDisplayName,
+            String body,
+            Instant createdAt,
+            Instant readAt) {}
 }

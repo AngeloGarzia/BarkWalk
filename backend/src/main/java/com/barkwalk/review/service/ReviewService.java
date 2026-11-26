@@ -2,6 +2,7 @@ package com.barkwalk.review.service;
 
 import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
+import com.barkwalk.common.PrivacyService;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.review.domain.Review;
 import com.barkwalk.review.dto.ReviewDtos.ReviewRequest;
@@ -22,16 +23,19 @@ public class ReviewService {
     private final BookingRepository bookingRepository;
     private final WalkRepository walkRepository;
     private final BusinessSettingsService businessSettingsService;
+    private final PrivacyService privacyService;
 
     public ReviewService(
             ReviewRepository reviewRepository,
             BookingRepository bookingRepository,
             WalkRepository walkRepository,
-            BusinessSettingsService businessSettingsService) {
+            BusinessSettingsService businessSettingsService,
+            PrivacyService privacyService) {
         this.reviewRepository = reviewRepository;
         this.bookingRepository = bookingRepository;
         this.walkRepository = walkRepository;
         this.businessSettingsService = businessSettingsService;
+        this.privacyService = privacyService;
     }
 
     @Transactional
@@ -70,7 +74,9 @@ public class ReviewService {
                 r.getId(),
                 r.getWalkId(),
                 r.getAuthorId(),
+                privacyService.displayName(r.getAuthorId()),
                 r.getTargetUserId(),
+                privacyService.displayName(r.getTargetUserId()),
                 r.getRating(),
                 r.getComment(),
                 r.getReply(),

@@ -10,7 +10,9 @@ import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.city.domain.City;
 import com.barkwalk.city.repository.CityRepository;
+import com.barkwalk.common.PrivacyService;
 import com.barkwalk.common.Role;
+import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.repository.ProfileRepository;
@@ -19,6 +21,7 @@ import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
+import com.barkwalk.walker.repository.WalkerProfileRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +49,12 @@ class WalkServiceTest {
     private ProfileRepository profileRepository;
     @Mock
     private BusinessSettingsService businessSettingsService;
+    @Mock
+    private PrivacyService privacyService;
+    @Mock
+    private DogRepository dogRepository;
+    @Mock
+    private WalkerProfileRepository walkerProfileRepository;
 
     @InjectMocks
     private WalkService walkService;

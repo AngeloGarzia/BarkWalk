@@ -15,5 +15,14 @@ public final class ReviewDtos {
             String comment) {}
 
     public record ReviewResponse(
-            Long id, Long walkId, Long authorId, Long targetUserId, int rating, String comment, String reply, Instant createdAt) {}
+            Long id,
+            Long walkId,
+            Long authorId,
+            String authorDisplayName,
+            Long targetUserId,
+            String targetDisplayName,
+            int rating,
+            String comment,
+            String reply,
+            Instant createdAt) {}
 }
