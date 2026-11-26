@@ -114,7 +114,10 @@ public class StorageService {
     }
 
     public String publicMediaUrl(String storageKey) {
-        long exp = Instant.now().plus(Duration.ofMinutes(signedUrlMinutes)).getEpochSecond();
+        // Stable within a slot: identical URL for repeated renders, valid for 1–2 windows.
+        long window = Math.max(1L, signedUrlMinutes) * 60L;
+        long now = Instant.now().getEpochSecond();
+        long exp = window * ((now / window) + 2);
         String sig = sign(storageKey, exp);
         return "/api/media/" + storageKey + "?exp=" + exp + "&sig=" + sig;
     }

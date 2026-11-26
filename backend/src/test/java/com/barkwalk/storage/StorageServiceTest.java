@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -84,13 +85,24 @@ class StorageServiceTest {
     }
 
     @Test
-    void publicMediaUrl_includesExpAndSig() {
-        String url = storageService.publicMediaUrl("profiles/1/photo.jpg");
-        assertThat(url).startsWith("/api/media/profiles/1/photo.jpg?exp=");
-        assertThat(url).contains("&sig=");
-        storageService.assertValidMediaSignature(
-                "profiles/1/photo.jpg",
-                Long.parseLong(url.replaceAll(".*exp=(\\d+).*", "$1")),
-                url.replaceAll(".*sig=([0-9a-f]+).*", "$1"));
+    void publicMediaUrl_isStableAndValidWithinWindow() {
+        String url1 = storageService.publicMediaUrl("profiles/1/photo.jpg");
+        String url2 = storageService.publicMediaUrl("profiles/1/photo.jpg");
+        assertThat(url1).isEqualTo(url2);
+        assertThat(url1).startsWith("/api/media/profiles/1/photo.jpg?exp=");
+        assertThat(url1).contains("&sig=");
+        long exp = Long.parseLong(url1.replaceAll(".*exp=(\\d+).*", "$1"));
+        String sig = url1.replaceAll(".*sig=([0-9a-f]+).*", "$1");
+        storageService.assertValidMediaSignature("profiles/1/photo.jpg", exp, sig);
+    }
+
+    @Test
+    void publicMediaUrl_rejectsExpiredSignature() {
+        long exp = Instant.now().getEpochSecond() - 30;
+        String sig = storageService.sign("profiles/1/photo.jpg", exp);
+        assertThatThrownBy(() -> storageService.assertValidMediaSignature("profiles/1/photo.jpg", exp, sig))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
     }
 }
