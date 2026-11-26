@@ -136,6 +136,11 @@ public class WalkService {
         walk.setAcceptedSizes(request.acceptedSizes().toArray(String[]::new));
         walk.setAcceptedEnergy(request.acceptedEnergy().toArray(String[]::new));
         walk.setMinSociabilityDogs(request.minSociabilityDogs());
+        // Balades dédiées catégorie 1/2 : réservées à l'admin.
+        if (request.allowsDangerCategories() && !admin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can create dedicated danger walks");
+        }
+        walk.setAllowsDangerCategories(request.allowsDangerCategories());
         walk.setRouteHint(request.routeHint());
         walk.setStatus("PUBLISHED");
         return toResponse(walkRepository.save(walk));
@@ -229,6 +234,7 @@ public class WalkService {
                 walk.getAcceptedSizes() == null ? List.of() : List.of(walk.getAcceptedSizes()),
                 walk.getAcceptedEnergy() == null ? List.of() : List.of(walk.getAcceptedEnergy()),
                 walk.getMinSociabilityDogs(),
+                walk.isAllowsDangerCategories(),
                 walk.getRouteHint(),
                 walk.isCommunityDisclaimerRequired());
     }

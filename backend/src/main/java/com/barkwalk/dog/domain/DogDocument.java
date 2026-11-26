@@ -36,6 +36,12 @@ public class DogDocument {
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt = Instant.now();
 
+    @Column(name = "reminder_j30_sent_at")
+    private Instant reminderJ30SentAt;
+
+    @Column(name = "reminder_j7_sent_at")
+    private Instant reminderJ7SentAt;
+
     public Long getId() {
         return id;
     }
@@ -82,5 +88,21 @@ public class DogDocument {
 
     public Instant getUploadedAt() {
         return uploadedAt;
+    }
+
+    public Instant getReminderJ30SentAt() {
+        return reminderJ30SentAt;
+    }
+
+    public void setReminderJ30SentAt(Instant reminderJ30SentAt) {
+        this.reminderJ30SentAt = reminderJ30SentAt;
+    }
+
+    public Instant getReminderJ7SentAt() {
+        return reminderJ7SentAt;
+    }
+
+    public void setReminderJ7SentAt(Instant reminderJ7SentAt) {
+        this.reminderJ7SentAt = reminderJ7SentAt;
     }
 }

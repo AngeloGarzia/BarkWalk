@@ -174,7 +174,7 @@ class WalkServiceTest {
         var req = new WalkCreateRequest(
                 1L, 3L, "COMMUNITY", "Balade test", "desc",
                 Instant.now().plusSeconds(86400), 60, 12, 0, null, null,
-                List.of("LARGE"), List.of("HIGH"), "GOOD", null, true);
+                List.of("LARGE"), List.of("HIGH"), "GOOD", false, null, true);
 
         assertThatThrownBy(() -> walkService.create(req))
                 .isInstanceOf(ResponseStatusException.class)
@@ -201,6 +201,7 @@ class WalkServiceTest {
                 List.of("LARGE"),
                 List.of("HIGH"),
                 "GOOD",
+                false,
                 null,
                 true);
     }

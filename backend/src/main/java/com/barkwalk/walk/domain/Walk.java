@@ -68,6 +68,10 @@ public class Walk {
     @Column(name = "min_sociability_dogs")
     private String minSociabilityDogs;
 
+    /** Balade dédiée chiens catégorie 1/2. */
+    @Column(name = "allows_danger_categories", nullable = false)
+    private boolean allowsDangerCategories;
+
     @Column(name = "route_hint")
     private String routeHint;
 
@@ -216,6 +220,14 @@ public class Walk {
 
     public void setMinSociabilityDogs(String minSociabilityDogs) {
         this.minSociabilityDogs = minSociabilityDogs;
+    }
+
+    public boolean isAllowsDangerCategories() {
+        return allowsDangerCategories;
+    }
+
+    public void setAllowsDangerCategories(boolean allowsDangerCategories) {
+        this.allowsDangerCategories = allowsDangerCategories;
     }
 
     public String getRouteHint() {

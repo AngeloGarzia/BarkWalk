@@ -20,6 +20,16 @@ public class DogWalkCompatibilityService {
             "GOOD", 3);
 
     public DogWalkCompatibility evaluate(Walk walk, Dog dog) {
+        // Catégorie 1/2 : uniquement sur balades dédiées (filtre admin).
+        boolean regulated = isRegulatedDanger(dog.getDangerCategory());
+        if (regulated && !walk.isAllowsDangerCategories()) {
+            return DogWalkCompatibility.incompatible(
+                    "Danger category " + dog.getDangerCategory() + " only allowed on dedicated walks");
+        }
+        if (!regulated && walk.isAllowsDangerCategories()) {
+            return DogWalkCompatibility.incompatible(
+                    "This dedicated walk accepts only danger category 1 or 2 dogs");
+        }
         if (!containsIgnoreCase(walk.getAcceptedSizes(), dog.getSizeCategory())) {
             return DogWalkCompatibility.incompatible(
                     "Size " + dog.getSizeCategory() + " not accepted for this walk");
@@ -38,6 +48,10 @@ public class DogWalkCompatibilityService {
             }
         }
         return DogWalkCompatibility.ok();
+    }
+
+    private static boolean isRegulatedDanger(String dangerCategory) {
+        return "1".equals(dangerCategory) || "2".equals(dangerCategory);
     }
 
     public void assertCompatible(Walk walk, Dog dog) {

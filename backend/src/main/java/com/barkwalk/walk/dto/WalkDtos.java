@@ -34,6 +34,7 @@ public final class WalkDtos {
             List<String> acceptedSizes,
             List<String> acceptedEnergy,
             String minSociabilityDogs,
+            boolean allowsDangerCategories,
             String routeHint,
             boolean communityDisclaimerRequired) {}
     public record WalkCreateRequest(
@@ -51,6 +52,7 @@ public final class WalkDtos {
             @NotEmpty List<String> acceptedSizes,
             @NotEmpty List<String> acceptedEnergy,
             String minSociabilityDogs,
+            boolean allowsDangerCategories,
             String routeHint,
             boolean communityDisclaimerRequired) {}
 }

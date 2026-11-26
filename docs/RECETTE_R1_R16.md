@@ -25,12 +25,12 @@ Date : 2026-11-26 — étapes 1–13 implémentées côté serveur.
 
 | Sujet | Détail |
 |-------|--------|
-| Catégorie chien 1/2 | Déclarable ; règle acceptation/refus/balades dédiées **non tranchée** |
-| Email réel | `NotificationService` = stub logs (pas de provider SMTP/Sendgrid) |
+| Catégorie chien 1/2 | Tranché : balades dédiées (`allows_danger_categories`, admin only) |
+| Email | Brevo API (`BREVO_API_KEY`) ou SMTP Brevo |
 | Stripe live | Webhook de dev + signature optionnelle ; pas de Checkout Session complète |
-| `INDEP_GUIDED` en DB | App gère le type ; CHECK V3 historique `STAFF_GUIDED\|COMMUNITY` — à aligner si prod indep |
-| Rappels J-30/J-7 docs | Settings lus + stub email ; sélection des docs à rappeler à enrichir |
-| Rappel veille de balade | Stub `notifyWalkTomorrow` ; pas encore de requête walks du lendemain |
+| `INDEP_GUIDED` en DB | V11 : CHECK mis à jour |
+| Rappels J-30/J-7 docs | `DocumentReminderService` + Brevo |
+| Rappel veille de balade | `WalkTomorrowReminderService` |
 | Concurrence dernière place | Lock pessimiste présent ; pas de test multi-thread dédié |
 | Photos profil/chien | WIP local non inclus dans les commits métier |
 

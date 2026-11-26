@@ -37,4 +37,13 @@ public interface WalkRepository extends JpaRepository<Walk, Long> {
         """)
     List<Walk> findForWalkerBetween(
             @Param("walkerId") Long walkerId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("""
+        SELECT w FROM Walk w
+        WHERE w.status = 'PUBLISHED'
+          AND w.startsAt >= :from
+          AND w.startsAt < :to
+        ORDER BY w.startsAt ASC
+        """)
+    List<Walk> findPublishedBetween(@Param("from") Instant from, @Param("to") Instant to);
 }

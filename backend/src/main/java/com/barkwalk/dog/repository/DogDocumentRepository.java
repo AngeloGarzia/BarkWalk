@@ -15,4 +15,15 @@ import jakarta.persistence.LockModeType;
 
 public interface DogDocumentRepository extends JpaRepository<DogDocument, Long> {
     List<DogDocument> findByDogId(Long dogId);
+
+    @Query("""
+        SELECT d FROM DogDocument d
+        WHERE d.status = 'VALIDATED'
+          AND d.expiresAt IS NOT NULL
+          AND d.expiresAt = :expiresOn
+          AND ((:kind = 'J30' AND d.reminderJ30SentAt IS NULL)
+            OR (:kind = 'J7' AND d.reminderJ7SentAt IS NULL))
+        """)
+    List<DogDocument> findDueReminders(
+            @Param("expiresOn") java.time.LocalDate expiresOn, @Param("kind") String kind);
 }

@@ -155,7 +155,7 @@ Table dogs {
   recall_level varchar(20)
   leash_pulling varchar(20)
   attention_notes text
-  danger_category varchar(5)
+  danger_category varchar(5) [note: '1|2 — uniquement balades allows_danger_categories']
   dossier_status varchar(30) [not null, default: 'DRAFT', note: 'DRAFT|PENDING|VALIDATED|REFUSED|EXPIRED']
   validated_by bigint [ref: > users.id]
   validated_at timestamptz
@@ -275,12 +275,13 @@ Table walks {
   public_id uuid [unique, not null]
   city_id bigint [not null, ref: > cities.id]
   meeting_point_id bigint [not null, ref: > meeting_points.id]
-  walk_type varchar(30) [not null, note: 'STAFF_GUIDED|COMMUNITY']
+  walk_type varchar(30) [not null, note: 'STAFF_GUIDED|INDEP_GUIDED|COMMUNITY']
   title varchar(160) [not null]
   description text
   starts_at timestamptz [not null]
   duration_minutes int [not null]
   capacity int [not null]
+  allows_danger_categories boolean [not null, default: false, note: 'balade dédiée catégorie 1/2']
   price_cents int [not null, default: 0]
   non_member_price_cents int
   walker_id bigint [ref: > walker_profiles.id]

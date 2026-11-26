@@ -59,11 +59,31 @@ class DogWalkCompatibilityServiceTest {
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    @Test
+    void evaluate_rejectsCategory1OnNormalWalk() {
+        Walk walk = walk(new String[] {"LARGE"}, new String[] {"HIGH"}, null);
+        Dog dog = dog("LARGE", "HIGH", "GOOD");
+        dog.setDangerCategory("1");
+        DogWalkCompatibility result = service.evaluate(walk, dog);
+        assertThat(result.compatible()).isFalse();
+        assertThat(result.reason()).contains("dedicated");
+    }
+
+    @Test
+    void evaluate_allowsCategory2OnDedicatedWalk() {
+        Walk walk = walk(new String[] {"LARGE"}, new String[] {"HIGH"}, null);
+        walk.setAllowsDangerCategories(true);
+        Dog dog = dog("LARGE", "HIGH", "GOOD");
+        dog.setDangerCategory("2");
+        assertThat(service.evaluate(walk, dog).compatible()).isTrue();
+    }
+
     private static Walk walk(String[] sizes, String[] energy, String minSoc) {
         Walk walk = new Walk();
         walk.setAcceptedSizes(sizes);
         walk.setAcceptedEnergy(energy);
         walk.setMinSociabilityDogs(minSoc);
+        walk.setAllowsDangerCategories(false);
         return walk;
     }
 

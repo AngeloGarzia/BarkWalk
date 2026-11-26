@@ -1,21 +1,21 @@
 package com.barkwalk.config;
 
 import com.barkwalk.admin.BusinessSettingsKeys;
-import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.service.BookingService;
 import com.barkwalk.booking.service.WaitlistService;
+import com.barkwalk.dog.service.DocumentReminderService;
 import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.membership.service.MembershipService;
 import com.barkwalk.messaging.service.MessagingService;
-import com.barkwalk.common.NotificationService;
+import com.barkwalk.walk.service.WalkTomorrowReminderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Étape 13 — automatismes planifiés regroupés :
- * R6 unpaid, R7 waitlist, R14 membership expiry, R16 dog dossier, archive messages, rappels docs.
+ * Automatismes planifiés :
+ * R6 unpaid, R7 waitlist, R14 membership, R16 dossier/docs, archive messages, rappel veille.
  */
 @Component
 public class BusinessJobsScheduler {
@@ -26,8 +26,8 @@ public class BusinessJobsScheduler {
     private final DogDossierService dogDossierService;
     private final MembershipService membershipService;
     private final MessagingService messagingService;
-    private final BusinessSettingsService businessSettingsService;
-    private final NotificationService notificationService;
+    private final DocumentReminderService documentReminderService;
+    private final WalkTomorrowReminderService walkTomorrowReminderService;
 
     public BusinessJobsScheduler(
             BookingService bookingService,
@@ -35,15 +35,15 @@ public class BusinessJobsScheduler {
             DogDossierService dogDossierService,
             MembershipService membershipService,
             MessagingService messagingService,
-            BusinessSettingsService businessSettingsService,
-            NotificationService notificationService) {
+            DocumentReminderService documentReminderService,
+            WalkTomorrowReminderService walkTomorrowReminderService) {
         this.bookingService = bookingService;
         this.waitlistService = waitlistService;
         this.dogDossierService = dogDossierService;
         this.membershipService = membershipService;
         this.messagingService = messagingService;
-        this.businessSettingsService = businessSettingsService;
-        this.notificationService = notificationService;
+        this.documentReminderService = documentReminderService;
+        this.walkTomorrowReminderService = walkTomorrowReminderService;
     }
 
     @Scheduled(fixedDelayString = "${barkwalk.jobs.core-ms:60000}")
@@ -60,15 +60,15 @@ public class BusinessJobsScheduler {
         int dossiers = dogDossierService.expireOverdueDossiers();
         int memberships = membershipService.expireOverdue();
         int archived = messagingService.archiveGroupThreadsOlderThanDays(7);
-        int j30 = businessSettingsService.docReminderJ30Days();
-        int j7 = businessSettingsService.docReminderJ7Days();
-        // Rappels docs / veille de balade : stub email piloté par settings (pas de magie en dur).
-        notificationService.notifyDocReminderSweep(j30, j7);
+        int docReminders = documentReminderService.sendDueReminders();
+        int walkReminders = walkTomorrowReminderService.sendTomorrowReminders();
         log.info(
-                "Daily jobs: dossiers={} memberships={} archivedThreads={} (settings {})",
+                "Daily jobs: dossiers={} memberships={} archived={} docReminders={} walkReminders={} ({})",
                 dossiers,
                 memberships,
                 archived,
+                docReminders,
+                walkReminders,
                 BusinessSettingsKeys.DOC_REMINDER_J30_DAYS);
     }
 }

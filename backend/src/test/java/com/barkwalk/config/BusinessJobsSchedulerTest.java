@@ -3,13 +3,13 @@ package com.barkwalk.config;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.service.BookingService;
 import com.barkwalk.booking.service.WaitlistService;
-import com.barkwalk.common.NotificationService;
+import com.barkwalk.dog.service.DocumentReminderService;
 import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.membership.service.MembershipService;
 import com.barkwalk.messaging.service.MessagingService;
+import com.barkwalk.walk.service.WalkTomorrowReminderService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,9 +30,9 @@ class BusinessJobsSchedulerTest {
     @Mock
     private MessagingService messagingService;
     @Mock
-    private BusinessSettingsService businessSettingsService;
+    private DocumentReminderService documentReminderService;
     @Mock
-    private NotificationService notificationService;
+    private WalkTomorrowReminderService walkTomorrowReminderService;
 
     @InjectMocks
     private BusinessJobsScheduler scheduler;
@@ -47,13 +47,14 @@ class BusinessJobsSchedulerTest {
     }
 
     @Test
-    void runDailyJobs_usesDocReminderSettings() {
+    void runDailyJobs_sendsReminders() {
         when(dogDossierService.expireOverdueDossiers()).thenReturn(0);
         when(membershipService.expireOverdue()).thenReturn(0);
         when(messagingService.archiveGroupThreadsOlderThanDays(7)).thenReturn(0);
-        when(businessSettingsService.docReminderJ30Days()).thenReturn(30);
-        when(businessSettingsService.docReminderJ7Days()).thenReturn(7);
+        when(documentReminderService.sendDueReminders()).thenReturn(3);
+        when(walkTomorrowReminderService.sendTomorrowReminders()).thenReturn(2);
         scheduler.runDailyJobs();
-        verify(notificationService).notifyDocReminderSweep(30, 7);
+        verify(documentReminderService).sendDueReminders();
+        verify(walkTomorrowReminderService).sendTomorrowReminders();
     }
 }
