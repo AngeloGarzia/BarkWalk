@@ -14,4 +14,8 @@ import jakarta.persistence.LockModeType;
 // Accès profils.
 
 public interface ProfileRepository extends JpaRepository<Profile, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Profile p where p.userId = :userId")
+    Optional<Profile> findByIdForUpdate(@Param("userId") Long userId);
 }

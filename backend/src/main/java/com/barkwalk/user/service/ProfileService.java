@@ -2,6 +2,8 @@ package com.barkwalk.user.service;
 
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.storage.StorageService;
+import com.barkwalk.storage.StorageTx;
+import com.barkwalk.storage.StoredImage;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.domain.ProfilePhoto;
 import com.barkwalk.user.domain.User;
@@ -13,7 +15,6 @@ import com.barkwalk.user.repository.ProfileRepository;
 import com.barkwalk.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -76,15 +77,17 @@ public class ProfileService {
     @Transactional
     public PhotoResponse uploadPhoto(MultipartFile file) {
         Long userId = SecurityUtils.currentUserId();
+        profileRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (photoRepository.countByUserId(userId) >= MAX_PHOTOS) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 3 photos par profil");
         }
         short nextOrder = nextSortOrder(userId);
-        String key = storageService.storeImage("profiles/" + userId, file);
+        StoredImage stored = storageService.storeImage("profiles/" + userId, file);
         ProfilePhoto photo = new ProfilePhoto();
         photo.setUserId(userId);
-        photo.setStorageKey(key);
-        photo.setContentType(normalizeType(file.getContentType()));
+        photo.setStorageKey(stored.storageKey());
+        photo.setContentType(stored.contentType());
         photo.setSortOrder(nextOrder);
         photo = photoRepository.save(photo);
         syncLegacyPhotoKey(userId);
@@ -94,12 +97,15 @@ public class ProfileService {
     @Transactional
     public void deletePhoto(Long photoId) {
         Long userId = SecurityUtils.currentUserId();
+        profileRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ProfilePhoto photo = photoRepository.findByIdAndUserId(photoId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        storageService.deleteObject(photo.getStorageKey());
+        String key = photo.getStorageKey();
         photoRepository.delete(photo);
         reindex(userId);
         syncLegacyPhotoKey(userId);
+        StorageTx.deleteAfterCommit(storageService, key);
     }
 
     private void reindex(Long userId) {
@@ -159,12 +165,5 @@ public class ProfileService {
 
     private PhotoResponse toPhoto(ProfilePhoto photo) {
         return new PhotoResponse(photo.getId(), storageService.publicMediaUrl(photo.getStorageKey()), photo.getSortOrder());
-    }
-
-    private static String normalizeType(String contentType) {
-        if (contentType == null || contentType.isBlank()) {
-            return "image/jpeg";
-        }
-        return contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
     }
 }

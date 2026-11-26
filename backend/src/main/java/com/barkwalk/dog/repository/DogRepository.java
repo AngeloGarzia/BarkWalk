@@ -15,5 +15,10 @@ import jakarta.persistence.LockModeType;
 
 public interface DogRepository extends JpaRepository<Dog, Long> {
     List<Dog> findByOwnerIdOrderByNameAsc(Long ownerId);
-        List<Dog> findByDossierStatus(String status);
+
+    List<Dog> findByDossierStatus(String status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from Dog d where d.id = :id")
+    Optional<Dog> findByIdForUpdate(@Param("id") Long id);
 }

@@ -9,9 +9,9 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -26,9 +26,11 @@ import org.springframework.web.server.ResponseStatusException;
 // Stockage objet : disque local en dev + URLs /api/media/... signées HMAC ; stubs MinIO conservés.
 @Service
 public class StorageService {
-    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
-            "image/jpeg", "image/jpg", "image/png", "image/webp");
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+    private static final byte[] JPEG_MAGIC = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] PNG_MAGIC = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47};
+    private static final byte[] RIFF_MAGIC = new byte[] {0x52, 0x49, 0x46, 0x46};
+    private static final byte[] WEBP_MAGIC = new byte[] {0x57, 0x45, 0x42, 0x50};
 
     private final String bucket;
     private final int signedUrlMinutes;
@@ -52,19 +54,24 @@ public class StorageService {
         return folder + "/" + UUID.randomUUID() + "-" + sanitizeFilename(filename);
     }
 
-    public String storeImage(String folder, MultipartFile file) {
+    public StoredImage storeImage(String folder, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier image requis");
         }
         if (file.getSize() > MAX_IMAGE_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image trop lourde (max 5 Mo)");
         }
-        String contentType = normalizeContentType(file.getContentType());
-        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
+        byte[] header;
+        try (InputStream in = file.getInputStream()) {
+            header = in.readNBytes(12);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier image illisible");
+        }
+        DetectedImage detected = detectImage(header);
+        if (detected == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formats acceptés : JPEG, PNG, WebP");
         }
-        String ext = extensionFor(contentType, file.getOriginalFilename());
-        String key = createObjectKey(folder, "photo." + ext);
+        String key = createObjectKey(folder, "photo." + detected.extension());
         Path target = resolveSafe(key);
         try {
             Files.createDirectories(target.getParent());
@@ -74,7 +81,7 @@ public class StorageService {
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Échec enregistrement image");
         }
-        return key;
+        return new StoredImage(key, detected.contentType());
     }
 
     public void deleteObject(String storageKey) {
@@ -146,6 +153,34 @@ public class StorageService {
         }
     }
 
+    static DetectedImage detectImage(byte[] header) {
+        if (header == null || header.length < 3) {
+            return null;
+        }
+        if (startsWith(header, JPEG_MAGIC)) {
+            return new DetectedImage("image/jpeg", "jpg");
+        }
+        if (header.length >= 4 && startsWith(header, PNG_MAGIC)) {
+            return new DetectedImage("image/png", "png");
+        }
+        if (header.length >= 12
+                && startsWith(header, RIFF_MAGIC)
+                && header[8] == WEBP_MAGIC[0]
+                && header[9] == WEBP_MAGIC[1]
+                && header[10] == WEBP_MAGIC[2]
+                && header[11] == WEBP_MAGIC[3]) {
+            return new DetectedImage("image/webp", "webp");
+        }
+        return null;
+    }
+
+    private static boolean startsWith(byte[] data, byte[] prefix) {
+        if (data.length < prefix.length) {
+            return false;
+        }
+        return Arrays.equals(Arrays.copyOf(data, prefix.length), prefix);
+    }
+
     private static boolean constantTimeEquals(String a, String b) {
         byte[] left = a.getBytes(StandardCharsets.UTF_8);
         byte[] right = b.getBytes(StandardCharsets.UTF_8);
@@ -165,26 +200,5 @@ public class StorageService {
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private static String normalizeContentType(String contentType) {
-        if (contentType == null) {
-            return "";
-        }
-        return contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
-    }
-
-    private static String extensionFor(String contentType, String originalFilename) {
-        return switch (contentType) {
-            case "image/png" -> "png";
-            case "image/webp" -> "webp";
-            default -> {
-                if (originalFilename != null && originalFilename.toLowerCase(Locale.ROOT).endsWith(".png")) {
-                    yield "png";
-                }
-                if (originalFilename != null && originalFilename.toLowerCase(Locale.ROOT).endsWith(".webp")) {
-                    yield "webp";
-                }
-                yield "jpg";
-            }
-        };
-    }
+    record DetectedImage(String contentType, String extension) {}
 }

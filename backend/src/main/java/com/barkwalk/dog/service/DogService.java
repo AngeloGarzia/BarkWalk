@@ -15,9 +15,10 @@ import com.barkwalk.dog.repository.DogDocumentRepository;
 import com.barkwalk.dog.repository.DogPhotoRepository;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.storage.StorageService;
+import com.barkwalk.storage.StorageTx;
+import com.barkwalk.storage.StoredImage;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,11 +82,14 @@ public class DogService {
     @Transactional
     public void delete(Long id) {
         Dog dog = owned(id);
-        for (DogPhoto photo : photoRepository.findByDogIdOrderBySortOrderAsc(id)) {
-            storageService.deleteObject(photo.getStorageKey());
-        }
+        List<String> keys = photoRepository.findByDogIdOrderBySortOrderAsc(id).stream()
+                .map(DogPhoto::getStorageKey)
+                .toList();
         photoRepository.deleteByDogId(id);
         dogRepository.delete(dog);
+        for (String key : keys) {
+            StorageTx.deleteAfterCommit(storageService, key);
+        }
     }
 
     @Transactional
@@ -133,16 +137,16 @@ public class DogService {
 
     @Transactional
     public PhotoResponse uploadPhoto(Long dogId, MultipartFile file) {
-        owned(dogId);
-        if (photoRepository.countByDogId(dogId) >= MAX_PHOTOS) {
+        Dog dog = lockOwned(dogId);
+        if (photoRepository.countByDogId(dog.getId()) >= MAX_PHOTOS) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 3 photos par chien");
         }
         short nextOrder = nextSortOrder(dogId);
-        String key = storageService.storeImage("dogs/" + dogId + "/photos", file);
+        StoredImage stored = storageService.storeImage("dogs/" + dogId + "/photos", file);
         DogPhoto photo = new DogPhoto();
         photo.setDogId(dogId);
-        photo.setStorageKey(key);
-        photo.setContentType(normalizeType(file.getContentType()));
+        photo.setStorageKey(stored.storageKey());
+        photo.setContentType(stored.contentType());
         photo.setSortOrder(nextOrder);
         photo = photoRepository.save(photo);
         syncLegacyPhotoKey(dogId);
@@ -151,13 +155,14 @@ public class DogService {
 
     @Transactional
     public void deletePhoto(Long dogId, Long photoId) {
-        owned(dogId);
+        lockOwned(dogId);
         DogPhoto photo = photoRepository.findByIdAndDogId(photoId, dogId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        storageService.deleteObject(photo.getStorageKey());
+        String key = photo.getStorageKey();
         photoRepository.delete(photo);
         reindex(dogId);
         syncLegacyPhotoKey(dogId);
+        StorageTx.deleteAfterCommit(storageService, key);
     }
 
     @Transactional
@@ -235,11 +240,22 @@ public class DogService {
 
     private Dog owned(Long id) {
         Dog dog = dogRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        assertOwnerOrAdmin(dog);
+        return dog;
+    }
+
+    private Dog lockOwned(Long id) {
+        Dog dog = dogRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        assertOwnerOrAdmin(dog);
+        return dog;
+    }
+
+    private void assertOwnerOrAdmin(Dog dog) {
         if (!dog.getOwnerId().equals(SecurityUtils.currentUserId())
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        return dog;
     }
 
     private void requireAdmin() {
@@ -294,12 +310,5 @@ public class DogService {
 
     private PhotoResponse toPhoto(DogPhoto photo) {
         return new PhotoResponse(photo.getId(), storageService.publicMediaUrl(photo.getStorageKey()), photo.getSortOrder());
-    }
-
-    private static String normalizeType(String contentType) {
-        if (contentType == null || contentType.isBlank()) {
-            return "image/jpeg";
-        }
-        return contentType.toLowerCase(Locale.ROOT).split(";")[0].trim();
     }
 }
