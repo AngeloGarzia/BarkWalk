@@ -16,4 +16,12 @@ public class NotificationService {
     public void notifyWaitlistOffer(Long walkId, Long userId, Long entryId) {
         log.info("EMAIL stub: waitlist offer walk={} user={} entry={}", walkId, userId, entryId);
     }
+
+    public void notifyDocReminderSweep(int j30Days, int j7Days) {
+        log.info("EMAIL stub: doc reminder sweep configured j30={} j7={}", j30Days, j7Days);
+    }
+
+    public void notifyWalkTomorrow(Long walkId, Long userId) {
+        log.info("EMAIL stub: walk {} reminder for user {}", walkId, userId);
+    }
 }
