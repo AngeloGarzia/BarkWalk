@@ -105,6 +105,98 @@ class DogServiceTest {
     }
 
     @Test
+    void update_validatedSensitiveField_setsPendingAndAudits() {
+        Dog dog = ownedDog(5L, 1L);
+        dog.setDossierStatus("VALIDATED");
+        dog.setBreed("Berger");
+        dog.setSizeCategory("LARGE");
+        dog.setEnergyLevel("HIGH");
+        dog.setSociabilityDogs("GOOD");
+        dog.setSociabilityHumans("GOOD");
+        dog.setSex("MALE");
+        dog.setSterilized(true);
+        dog.setBirthDate(LocalDate.of(2020, 1, 1));
+        dog.setIdentificationNumber("123");
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+
+        DogRequest changed = new DogRequest(
+                "Rex",
+                "Berger",
+                LocalDate.of(2020, 1, 1),
+                "MALE",
+                true,
+                new BigDecimal("28.5"),
+                "MEDIUM", // taille sensible
+                "123",
+                "HIGH",
+                "GOOD",
+                "GOOD",
+                "GOOD",
+                "LOW",
+                null,
+                null);
+
+        var response = dogService.update(5L, changed);
+
+        assertThat(response.dossierStatus()).isEqualTo("PENDING");
+        assertThat(response.sizeCategory()).isEqualTo("MEDIUM");
+        verify(auditService)
+                .log(eq(1L), eq("DOG_SENSITIVE_EDIT"), eq("DOG"), eq(5L), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void update_validatedFreeFieldOnly_keepsValidated() {
+        Dog dog = ownedDog(5L, 1L);
+        dog.setDossierStatus("VALIDATED");
+        dog.setBreed("Berger");
+        dog.setSizeCategory("LARGE");
+        dog.setEnergyLevel("HIGH");
+        dog.setSociabilityDogs("GOOD");
+        dog.setSociabilityHumans("GOOD");
+        dog.setSex("MALE");
+        dog.setSterilized(true);
+        dog.setBirthDate(LocalDate.of(2020, 1, 1));
+        dog.setIdentificationNumber("123");
+        dog.setWeightKg(new BigDecimal("28.5"));
+        dog.setRecallLevel("GOOD");
+        dog.setLeashPulling("LOW");
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+
+        DogRequest freeOnly = new DogRequest(
+                "Rexou", // name libre
+                "Berger",
+                LocalDate.of(2020, 1, 1),
+                "MALE",
+                true,
+                new BigDecimal("30.0"), // poids libre
+                "LARGE",
+                "123",
+                "HIGH",
+                "GOOD",
+                "GOOD",
+                "GOOD",
+                "LOW",
+                "Calme en laisse", // notes libres
+                null);
+
+        var response = dogService.update(5L, freeOnly);
+
+        assertThat(response.dossierStatus()).isEqualTo("VALIDATED");
+        assertThat(response.name()).isEqualTo("Rexou");
+    }
+
+    @Test
+    void update_draftAnyField_staysDraft() {
+        Dog dog = ownedDog(5L, 1L);
+        dog.setDossierStatus("DRAFT");
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+
+        var response = dogService.update(5L, sampleRequest());
+
+        assertThat(response.dossierStatus()).isEqualTo("DRAFT");
+    }
+
+    @Test
     void validate_requiresAdmin() {
         assertThatThrownBy(() -> dogService.validate(5L))
                 .isInstanceOf(ResponseStatusException.class)

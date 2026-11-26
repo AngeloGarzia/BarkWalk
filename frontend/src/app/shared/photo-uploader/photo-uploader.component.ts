@@ -74,6 +74,20 @@ export interface PhotoItem {
       @if (cameraOpen()) {
         <div class="camera-overlay" role="dialog" aria-modal="true" aria-label="Prise de photo">
           <div class="camera-panel">
+            @if (videoDevices().length > 0) {
+              <label class="device-pick">
+                Caméra
+                <select
+                  [value]="selectedDeviceId()"
+                  (change)="onDeviceChange($event)"
+                  aria-label="Choisir le périphérique caméra"
+                >
+                  @for (device of videoDevices(); track device.deviceId) {
+                    <option [value]="device.deviceId">{{ deviceLabel(device, $index) }}</option>
+                  }
+                </select>
+              </label>
+            }
             <video #preview autoplay playsinline muted></video>
             <canvas #snap hidden></canvas>
             <div class="camera-actions">
@@ -231,6 +245,22 @@ export interface PhotoItem {
         background: #111;
         object-fit: cover;
       }
+      .device-pick {
+        display: grid;
+        gap: 0.3rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--forest-deep);
+      }
+      .device-pick select {
+        width: 100%;
+        padding: 0.45rem 0.55rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        font: inherit;
+        background: var(--bg, #fff);
+        color: inherit;
+      }
       .camera-actions {
         display: flex;
         flex-direction: column;
@@ -260,6 +290,8 @@ export class PhotoUploaderComponent {
   protected readonly uploading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly cameraOpen = signal(false);
+  protected readonly videoDevices = signal<MediaDeviceInfo[]>([]);
+  protected readonly selectedDeviceId = signal<string>('');
 
   private stream: MediaStream | null = null;
 
@@ -270,26 +302,41 @@ export class PhotoUploaderComponent {
       return;
     }
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: true,
-      });
+      await this.startStream(this.selectedDeviceId() || undefined);
+      await this.refreshVideoDevices();
       this.cameraOpen.set(true);
       this.cdr.detectChanges();
-      const video = this.previewRef?.nativeElement;
-      if (video) {
-        video.srcObject = this.stream;
-        await video.play().catch(() => undefined);
-      }
+      await this.attachPreview();
     } catch {
       this.closeCamera();
       this.error.set('Impossible d’accéder à la caméra (permission refusée ?).');
     }
   }
 
+  protected async onDeviceChange(event: Event): Promise<void> {
+    const deviceId = (event.target as HTMLSelectElement).value;
+    this.selectedDeviceId.set(deviceId);
+    try {
+      await this.startStream(deviceId);
+      this.cdr.detectChanges();
+      await this.attachPreview();
+    } catch {
+      this.error.set('Impossible de basculer sur cette caméra.');
+    }
+  }
+
+  protected deviceLabel(device: MediaDeviceInfo, index: number): string {
+    const label = device.label?.trim();
+    if (label) {
+      return label;
+    }
+    return `Caméra ${index + 1}`;
+  }
+
   protected closeCamera(): void {
     this.stopStream();
     this.cameraOpen.set(false);
+    this.videoDevices.set([]);
   }
 
   protected takePhoto(): void {
@@ -375,6 +422,39 @@ export class PhotoUploaderComponent {
         this.uploading.set(false);
       },
     });
+  }
+
+  private async startStream(deviceId?: string): Promise<void> {
+    this.stopStream();
+    const video: boolean | MediaTrackConstraints = deviceId
+      ? { deviceId: { exact: deviceId } }
+      : true;
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video,
+    });
+    const activeId = this.stream.getVideoTracks()[0]?.getSettings()?.deviceId;
+    if (activeId) {
+      this.selectedDeviceId.set(activeId);
+    }
+  }
+
+  private async attachPreview(): Promise<void> {
+    const video = this.previewRef?.nativeElement;
+    if (!video || !this.stream) {
+      return;
+    }
+    video.srcObject = this.stream;
+    await video.play().catch(() => undefined);
+  }
+
+  private async refreshVideoDevices(): Promise<void> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((d) => d.kind === 'videoinput');
+    this.videoDevices.set(cameras);
+    if (!this.selectedDeviceId() && cameras[0]?.deviceId) {
+      this.selectedDeviceId.set(cameras[0].deviceId);
+    }
   }
 
   private stopStream(): void {

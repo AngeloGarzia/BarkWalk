@@ -35,6 +35,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'walks/:id/live',
+    loadComponent: () =>
+      import('./features/walk-live/walk-live.component').then(m => m.WalkLiveComponent),
+    canActivate: [authGuard],
+  },
+  {
     path: 'admin',
     loadComponent: () => import('./features/admin/admin.component').then(m => m.AdminComponent),
     canActivate: [authGuard, adminGuard],

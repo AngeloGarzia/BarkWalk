@@ -12,6 +12,7 @@ import com.barkwalk.membership.domain.Membership;
 import com.barkwalk.membership.domain.MembershipPlan;
 import com.barkwalk.membership.repository.MembershipPlanRepository;
 import com.barkwalk.membership.repository.MembershipRepository;
+import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.domain.User;
 import com.barkwalk.user.repository.ProfileRepository;
@@ -20,6 +21,7 @@ import com.barkwalk.walk.domain.MeetingPoint;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
+import com.barkwalk.walk.service.WalkDifficultyCalculator;
 import com.barkwalk.walker.domain.WalkerProfile;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
 import java.math.BigDecimal;
@@ -28,6 +30,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -54,6 +57,8 @@ public class DemoDataInitializer implements ApplicationRunner {
             String routeHint,
             int daysFromNow,
             int durationMinutes,
+            int elevationGainM,
+            String terrainType,
             int capacity,
             int nonMemberPriceCents) {}
 
@@ -70,6 +75,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Tour du lac ~4 km",
                     2,
                     60,
+                    40,
+                    "PARK",
                     8,
                     1500),
             new DemoSpot(
@@ -84,6 +91,24 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Berges du Rhône",
                     3,
                     45,
+                    15,
+                    "FLAT",
+                    6,
+                    0),
+            new DemoSpot(
+                    "69001",
+                    "Croix-Rousse",
+                    "Place de la Croix-Rousse, 69004 Lyon",
+                    45.7745,
+                    4.8322,
+                    "Descente Croix-Rousse (passée)",
+                    "Balade terminée — ouverte aux notes participants.",
+                    "COMMUNITY",
+                    "Pentes de la Croix-Rousse ~2,5 km",
+                    -3,
+                    50,
+                    90,
+                    "TRAIL",
                     6,
                     0),
             new DemoSpot(
@@ -98,6 +123,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Allées du jardin ~3 km",
                     2,
                     55,
+                    25,
+                    "PARK",
                     8,
                     1800),
             new DemoSpot(
@@ -111,7 +138,9 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "STAFF_GUIDED",
                     "Boucle du parc ~3,5 km",
                     4,
-                    60,
+                    70,
+                    160,
+                    "TRAIL",
                     7,
                     1800),
             new DemoSpot(
@@ -126,6 +155,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Parc + corniche ~4 km",
                     3,
                     60,
+                    55,
+                    "PARK",
                     8,
                     1600),
             new DemoSpot(
@@ -140,6 +171,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Jardin + Canal ~3 km",
                     5,
                     50,
+                    30,
+                    "PARK",
                     8,
                     1400),
             new DemoSpot(
@@ -154,6 +187,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Tour du jardin ~2,5 km",
                     4,
                     45,
+                    20,
+                    "PARK",
                     6,
                     1500),
             new DemoSpot(
@@ -164,10 +199,12 @@ public class DemoDataInitializer implements ApplicationRunner {
                     -1.5540,
                     "Nantes Île de Versailles",
                     "Balade jardin japonais et bords de l'Erdre.",
-                    "STAFF_GUIDED",
+                    "INDEP_GUIDED",
                     "Île + quais ~3 km",
                     6,
                     55,
+                    35,
+                    "PARK",
                     7,
                     1400),
             new DemoSpot(
@@ -182,6 +219,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Boucle Orangerie ~3 km",
                     5,
                     50,
+                    25,
+                    "PARK",
                     8,
                     1500),
             new DemoSpot(
@@ -196,6 +235,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Tour de la citadelle ~4 km",
                     3,
                     60,
+                    70,
+                    "FOREST",
                     8,
                     1400),
             new DemoSpot(
@@ -210,6 +251,8 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "Écusson ~2 km",
                     7,
                     40,
+                    10,
+                    "FLAT",
                     5,
                     0),
             new DemoSpot(
@@ -223,7 +266,9 @@ public class DemoDataInitializer implements ApplicationRunner {
                     "STAFF_GUIDED",
                     "Parc + berges ~3,5 km",
                     4,
-                    55,
+                    75,
+                    220,
+                    "MOUNTAIN",
                     7,
                     1500));
 
@@ -238,6 +283,8 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final WalkerProfileRepository walkerProfileRepository;
     private final MeetingPointRepository meetingPointRepository;
     private final WalkRepository walkRepository;
+    private final WalkDifficultyCalculator difficultyCalculator;
+    private final MessagingService messagingService;
 
     public DemoDataInitializer(
             UserRepository userRepository,
@@ -250,7 +297,9 @@ public class DemoDataInitializer implements ApplicationRunner {
             DogDocumentRepository dogDocumentRepository,
             WalkerProfileRepository walkerProfileRepository,
             MeetingPointRepository meetingPointRepository,
-            WalkRepository walkRepository) {
+            WalkRepository walkRepository,
+            WalkDifficultyCalculator difficultyCalculator,
+            MessagingService messagingService) {
         this.userRepository = userRepository;
         this.profileRepository = profileRepository;
         this.passwordEncoder = passwordEncoder;
@@ -262,6 +311,8 @@ public class DemoDataInitializer implements ApplicationRunner {
         this.walkerProfileRepository = walkerProfileRepository;
         this.meetingPointRepository = meetingPointRepository;
         this.walkRepository = walkRepository;
+        this.difficultyCalculator = difficultyCalculator;
+        this.messagingService = messagingService;
     }
 
     @Override
@@ -272,71 +323,132 @@ public class DemoDataInitializer implements ApplicationRunner {
                 .map(City::getId)
                 .orElseGet(() -> cityRepository.findAll().stream().findFirst().map(City::getId).orElse(null));
 
+        // Un compte démo par rôle applicatif (mot de passe commun : Admin123!).
         User admin = upsertUser("admin@barkwalk.fr", Set.of(Role.ADMIN, Role.USER), "Admin", "BarkWalk", lyonId);
-        User alice = upsertUser(
-                "alice@example.com", Set.of(Role.USER, Role.MEMBER, Role.COMMUNITY_ORG), "Alice", "Martin", lyonId);
+        User plainUser = upsertUser("user@barkwalk.fr", Set.of(Role.USER), "Jules", "Dupont", lyonId);
+        User member = upsertUser("member@barkwalk.fr", Set.of(Role.USER, Role.MEMBER), "Léa", "Bernard", lyonId);
+        User communityOrg = upsertUser(
+                "org@barkwalk.fr", Set.of(Role.USER, Role.MEMBER, Role.COMMUNITY_ORG), "Camille", "Org", lyonId);
         User walker =
                 upsertUser("walker@barkwalk.fr", Set.of(Role.USER, Role.WALKER_STAFF), "Sam", "Walker", lyonId);
+        User walkerIndep =
+                upsertUser("indep@barkwalk.fr", Set.of(Role.USER, Role.WALKER_INDEP), "Inès", "Indep", lyonId);
+        // Compte historique multi-rôles (rétrocompat docs / recettes).
+        User alice = upsertUser(
+                "alice@example.com", Set.of(Role.USER, Role.MEMBER, Role.COMMUNITY_ORG), "Alice", "Martin", lyonId);
 
-        Profile aliceProfile = profileRepository.findById(alice.getId()).orElseThrow();
-        aliceProfile.setCompletedWalksCount(3);
-        aliceProfile.setCommunityOrgStatus("ACTIVE");
-        aliceProfile.setPhone("+33600000001");
+        enrichProfile(plainUser.getId(), "+33600000010", "NONE", 0, "PatteDouce");
+        enrichProfile(member.getId(), "+33600000011", "NONE", 1, "NalaEtLea");
+        enrichProfile(communityOrg.getId(), "+33600000012", "ACTIVE", 5, "BergesCamille");
+        enrichProfile(alice.getId(), "+33600000001", "ACTIVE", 3, "FlairMartin");
+        enrichProfile(walker.getId(), "+33600000013", "NONE", 0, "CapLaisse");
+        enrichProfile(walkerIndep.getId(), "+33600000014", "NONE", 0, "CanicrossInes");
+        enrichProfile(admin.getId(), "+33600000000", "NONE", 0, "GardienDuParc");
 
-        Dog rex;
-        if (dogRepository.findByOwnerIdOrderByNameAsc(alice.getId()).isEmpty()) {
-            Dog dog = new Dog();
-            dog.setOwnerId(alice.getId());
-            dog.setName("Rex");
-            dog.setBreed("Berger allemand");
-            dog.setBirthDate(LocalDate.of(2020, 5, 12));
-            dog.setSex("MALE");
-            dog.setSterilized(true);
-            dog.setWeightKg(new BigDecimal("32.50"));
-            dog.setSizeCategory("LARGE");
-            dog.setEnergyLevel("HIGH");
-            dog.setSociabilityDogs("GOOD");
-            dog.setSociabilityHumans("GOOD");
-            dog.setDossierStatus("VALIDATED");
-            rex = dogRepository.save(dog);
-        } else {
-            rex = dogRepository.findByOwnerIdOrderByNameAsc(alice.getId()).getFirst();
+        ensureDemoDog(alice.getId(), "Rex", "Berger allemand");
+        ensureDemoDog(member.getId(), "Nala", "Labrador");
+        ensureDemoDog(communityOrg.getId(), "Milo", "Golden Retriever");
+
+        ensureActiveMembership(member.getId());
+        ensureActiveMembership(communityOrg.getId());
+        ensureActiveMembership(alice.getId());
+
+        WalkerProfile walkerProfile = ensureWalkerProfile(
+                walker.getId(), "STAFF", "Encadrant salarié Bark & Walk", new BigDecimal("4.80"), 12);
+        WalkerProfile indepProfile = ensureWalkerProfile(
+                walkerIndep.getId(), "INDEP", "Promeneur indépendant Bark & Walk", new BigDecimal("4.60"), 7);
+
+        seedFranceWalks(walkerProfile, indepProfile, communityOrg, walker);
+    }
+
+    private void enrichProfile(Long userId, String phone, String communityOrgStatus, int completedWalks) {
+        Profile profile = profileRepository.findById(userId).orElseThrow();
+        profile.setPhone(phone);
+        profile.setCommunityOrgStatus(communityOrgStatus);
+        profile.setCompletedWalksCount(completedWalks);
+        if (profile.getReviewStatus() == null || profile.getReviewStatus().isBlank()) {
+            profile.setReviewStatus("VALIDATED");
         }
-        ensureValidatedRequiredDocs(rex);
+        profile.setUpdatedAt(Instant.now());
+        profileRepository.save(profile);
+    }
 
+    private void enrichProfile(
+            Long userId, String phone, String communityOrgStatus, int completedWalks, String pseudo) {
+        Profile profile = profileRepository.findById(userId).orElseThrow();
+        profile.setPhone(phone);
+        profile.setCommunityOrgStatus(communityOrgStatus);
+        profile.setCompletedWalksCount(completedWalks);
+        if (pseudo != null && !pseudo.isBlank()) {
+            profile.setPseudo(pseudo);
+        }
+        if (profile.getReviewStatus() == null || profile.getReviewStatus().isBlank()) {
+            profile.setReviewStatus("VALIDATED");
+        }
+        profile.setUpdatedAt(Instant.now());
+        profileRepository.save(profile);
+    }
+
+    private void ensureDemoDog(Long ownerId, String name, String breed) {
+        if (!dogRepository.findByOwnerIdOrderByNameAsc(ownerId).isEmpty()) {
+            Dog existing = dogRepository.findByOwnerIdOrderByNameAsc(ownerId).getFirst();
+            ensureValidatedRequiredDocs(existing);
+            return;
+        }
+        Dog dog = new Dog();
+        dog.setOwnerId(ownerId);
+        dog.setName(name);
+        dog.setBreed(breed);
+        dog.setBirthDate(LocalDate.of(2020, 5, 12));
+        dog.setSex("MALE");
+        dog.setSterilized(true);
+        dog.setWeightKg(new BigDecimal("28.50"));
+        dog.setSizeCategory("LARGE");
+        dog.setEnergyLevel("HIGH");
+        dog.setSociabilityDogs("GOOD");
+        dog.setSociabilityHumans("GOOD");
+        dog.setDossierStatus("VALIDATED");
+        Dog saved = dogRepository.save(dog);
+        ensureValidatedRequiredDocs(saved);
+    }
+
+    private void ensureActiveMembership(Long userId) {
         MembershipPlan monthly = planRepository.findByActiveTrue().stream()
                 .filter(p -> "MONTHLY".equals(p.getCode()))
                 .findFirst()
                 .orElse(null);
-        if (monthly != null
-                && membershipRepository
-                        .findFirstByUserIdAndStatusOrderByCreatedAtDesc(alice.getId(), "ACTIVE")
-                        .isEmpty()) {
-            Membership membership = new Membership();
-            membership.setUserId(alice.getId());
-            membership.setPlanId(monthly.getId());
-            membership.setStatus("ACTIVE");
-            membership.setCurrentPeriodStart(Instant.now().minus(5, ChronoUnit.DAYS));
-            membership.setCurrentPeriodEnd(Instant.now().plus(25, ChronoUnit.DAYS));
-            membershipRepository.save(membership);
+        if (monthly == null
+                || membershipRepository
+                        .findFirstByUserIdAndStatusOrderByCreatedAtDesc(userId, "ACTIVE")
+                        .isPresent()) {
+            return;
         }
+        Membership membership = new Membership();
+        membership.setUserId(userId);
+        membership.setPlanId(monthly.getId());
+        membership.setStatus("ACTIVE");
+        membership.setCurrentPeriodStart(Instant.now().minus(5, ChronoUnit.DAYS));
+        membership.setCurrentPeriodEnd(Instant.now().plus(25, ChronoUnit.DAYS));
+        membershipRepository.save(membership);
+    }
 
-        WalkerProfile walkerProfile = walkerProfileRepository.findByUserId(walker.getId()).orElseGet(() -> {
+    private WalkerProfile ensureWalkerProfile(
+            Long userId, String walkerType, String bio, BigDecimal rating, int ratingsCount) {
+        return walkerProfileRepository.findByUserId(userId).orElseGet(() -> {
             WalkerProfile wp = new WalkerProfile();
-            wp.setUserId(walker.getId());
-            wp.setWalkerType("STAFF");
+            wp.setUserId(userId);
+            wp.setWalkerType(walkerType);
             wp.setStatus("VALIDATED");
-            wp.setBio("Encadrant salarié Bark & Walk");
-            wp.setAverageRating(new BigDecimal("4.80"));
-            wp.setRatingsCount(12);
+            wp.setBio(bio);
+            wp.setAverageRating(rating);
+            wp.setRatingsCount(ratingsCount);
             wp.setCharterSignedAt(Instant.now());
             return walkerProfileRepository.save(wp);
         });
-
-        seedFranceWalks(walkerProfile, alice);
     }
 
-    private void seedFranceWalks(WalkerProfile walkerProfile, User alice) {
+    private void seedFranceWalks(
+            WalkerProfile staffWalker, WalkerProfile indepWalker, User communityOrg, User staffUser) {
         for (DemoSpot spot : FRANCE_SPOTS) {
             City city = cityRepository.search(spot.postalCode(), PageRequest.of(0, 1)).stream()
                     .findFirst()
@@ -345,47 +457,122 @@ public class DemoDataInitializer implements ApplicationRunner {
                 continue;
             }
 
-            boolean alreadyHasPoint = meetingPointRepository.findByCityIdAndActiveTrue(city.getId()).stream()
-                    .anyMatch(mp -> mp.getName().equalsIgnoreCase(spot.meetingName()));
-            if (alreadyHasPoint) {
-                continue;
-            }
+            MeetingPoint mp = meetingPointRepository.findByCityIdAndActiveTrue(city.getId()).stream()
+                    .filter(p -> p.getName().equalsIgnoreCase(spot.meetingName()))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        MeetingPoint created = new MeetingPoint();
+                        created.setCityId(city.getId());
+                        created.setName(spot.meetingName());
+                        created.setAddress(spot.address());
+                        created.setLat(spot.lat());
+                        created.setLng(spot.lng());
+                        return meetingPointRepository.save(created);
+                    });
 
-            MeetingPoint mp = new MeetingPoint();
-            mp.setCityId(city.getId());
-            mp.setName(spot.meetingName());
-            mp.setAddress(spot.address());
-            mp.setLat(spot.lat());
-            mp.setLng(spot.lng());
-            mp = meetingPointRepository.save(mp);
-
-            Walk walk = new Walk();
+            Walk walk = findDemoWalk(city.getId(), spot.title()).orElseGet(Walk::new);
+            boolean isNew = walk.getId() == null;
             walk.setCityId(city.getId());
             walk.setMeetingPointId(mp.getId());
             walk.setWalkType(spot.walkType());
             walk.setTitle(spot.title());
             walk.setDescription(spot.description());
-            walk.setStartsAt(Instant.now().plus(spot.daysFromNow(), ChronoUnit.DAYS));
             walk.setDurationMinutes(spot.durationMinutes());
+            int elevation = difficultyCalculator.normalizeElevation(spot.elevationGainM());
+            String terrain = difficultyCalculator.normalizeTerrain(spot.terrainType());
+            walk.setElevationGainM(elevation);
+            walk.setTerrainType(terrain);
+            walk.setDifficultyLevel(difficultyCalculator.compute(spot.durationMinutes(), elevation, terrain));
             walk.setCapacity(spot.capacity());
             walk.setPriceCents(0);
-            if (spot.nonMemberPriceCents() > 0) {
-                walk.setNonMemberPriceCents(spot.nonMemberPriceCents());
-            }
+            walk.setNonMemberPriceCents(spot.nonMemberPriceCents() > 0 ? spot.nonMemberPriceCents() : null);
+            walk.setRouteHint(spot.routeHint());
+            walk.setUpdatedAt(Instant.now());
+
             if ("COMMUNITY".equals(spot.walkType())) {
-                walk.setOrganizerUserId(alice.getId());
+                walk.setOrganizerUserId(communityOrg.getId());
+                walk.setWalkerId(null);
                 walk.setAcceptedSizes(new String[] {"SMALL", "MEDIUM"});
                 walk.setAcceptedEnergy(new String[] {"LOW", "MEDIUM"});
+                walk.setMinSociabilityDogs(null);
+            } else if ("INDEP_GUIDED".equals(spot.walkType())) {
+                walk.setOrganizerUserId(indepWalker.getUserId());
+                walk.setWalkerId(indepWalker.getId());
+                walk.setAcceptedSizes(new String[] {"SMALL", "MEDIUM", "LARGE"});
+                walk.setAcceptedEnergy(new String[] {"LOW", "MEDIUM", "HIGH"});
+                walk.setMinSociabilityDogs("GOOD");
             } else {
-                walk.setWalkerId(walkerProfile.getId());
+                walk.setOrganizerUserId(staffUser.getId());
+                walk.setWalkerId(staffWalker.getId());
                 walk.setAcceptedSizes(new String[] {"SMALL", "MEDIUM", "LARGE"});
                 walk.setAcceptedEnergy(new String[] {"LOW", "MEDIUM", "HIGH"});
                 walk.setMinSociabilityDogs("GOOD");
             }
-            walk.setStatus("PUBLISHED");
-            walk.setRouteHint(spot.routeHint());
-            walkRepository.save(walk);
+
+            Instant startsAt = Instant.now().plus(spot.daysFromNow(), ChronoUnit.DAYS);
+            // Ne pas écraser une balade déjà démarrée / terminée hors seed passé.
+            if (isNew
+                    || walk.getArchivedAt() == null
+                            && !"IN_PROGRESS".equals(walk.getStatus())
+                            && !"COMPLETED".equals(walk.getStatus())
+                            && !"CANCELLED".equals(walk.getStatus())) {
+                walk.setStartsAt(startsAt);
+            } else if (walk.getStartsAt() == null) {
+                walk.setStartsAt(startsAt);
+            }
+
+            if (spot.daysFromNow() < 0) {
+                Instant end = startsAt.plus(spot.durationMinutes(), ChronoUnit.MINUTES);
+                walk.setStartsAt(startsAt);
+                walk.setStatus("COMPLETED");
+                walk.setStartedAt(startsAt);
+                walk.setCompletedAt(end);
+                walk.setArchivedAt(end);
+            } else if (isNew) {
+                walk.setStatus("PUBLISHED");
+                walk.setStartedAt(null);
+                walk.setCompletedAt(null);
+                walk.setArchivedAt(null);
+            }
+
+            Walk saved = walkRepository.save(walk);
+            if (saved.getArchivedAt() == null) {
+                messagingService.ensureWalkThread(saved);
+            }
+            archiveDemoDuplicates(spot.title(), saved.getId());
         }
+    }
+
+    private Optional<Walk> findDemoWalk(Long cityId, String title) {
+        return walkRepository.findAll().stream()
+                .filter(w -> title.equalsIgnoreCase(w.getTitle()))
+                .filter(w -> w.getArchivedAt() == null || "COMPLETED".equals(w.getStatus()))
+                .sorted((a, b) -> {
+                    // Préfère la ville cible, puis le plus ancien id.
+                    boolean aMatch = cityId.equals(a.getCityId());
+                    boolean bMatch = cityId.equals(b.getCityId());
+                    if (aMatch != bMatch) {
+                        return aMatch ? -1 : 1;
+                    }
+                    return Long.compare(a.getId(), b.getId());
+                })
+                .findFirst();
+    }
+
+    /** Conserve une seule balade démo active par titre (évite les doublons multi-CP Lyon). */
+    private void archiveDemoDuplicates(String title, Long keepId) {
+        Instant now = Instant.now();
+        walkRepository.findAll().stream()
+                .filter(w -> title.equalsIgnoreCase(w.getTitle())
+                        && !keepId.equals(w.getId())
+                        && w.getArchivedAt() == null)
+                .forEach(dup -> {
+                    dup.setStatus("CANCELLED");
+                    dup.setCancellationReason("demo_duplicate");
+                    dup.setArchivedAt(now);
+                    dup.setUpdatedAt(now);
+                    walkRepository.save(dup);
+                });
     }
 
     private User upsertUser(String email, Set<Role> roles, String firstName, String lastName, Long cityId) {
@@ -405,6 +592,9 @@ public class DemoDataInitializer implements ApplicationRunner {
         profile.setLastName(lastName);
         if (profile.getCityId() == null) {
             profile.setCityId(cityId);
+        }
+        if (profile.getReviewStatus() == null || profile.getReviewStatus().isBlank()) {
+            profile.setReviewStatus("VALIDATED");
         }
         profile.setUpdatedAt(Instant.now());
         profileRepository.save(profile);

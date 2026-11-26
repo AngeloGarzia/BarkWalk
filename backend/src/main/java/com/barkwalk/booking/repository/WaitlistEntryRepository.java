@@ -19,4 +19,10 @@ public interface WaitlistEntryRepository extends JpaRepository<WaitlistEntry, Lo
     long countByWalkId(Long walkId);
 
     List<WaitlistEntry> findByStatusAndOfferExpiresAtBefore(String status, Instant before);
+
+    List<WaitlistEntry> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    List<WaitlistEntry> findByWalkId(Long walkId);
+
+    void deleteByWalkId(Long walkId);
 }

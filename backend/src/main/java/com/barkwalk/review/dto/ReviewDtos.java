@@ -25,4 +25,28 @@ public final class ReviewDtos {
             String comment,
             String reply,
             Instant createdAt) {}
+
+    /** Note d'un participant sur la balade elle-même (1–5). */
+    public record WalkRatingRequest(
+            @NotNull Long walkId,
+            @Min(1) @Max(5) int rating,
+            String comment) {}
+
+    public record WalkRatingResponse(
+            Long id,
+            Long walkId,
+            String walkTitle,
+            Instant startsAt,
+            Long userId,
+            int rating,
+            String comment,
+            Instant createdAt,
+            boolean canRate) {}
+
+    public record WalkRatingSummary(
+            Long walkId,
+            double averageRating,
+            long ratingsCount,
+            Integer myRating,
+            boolean canRate) {}
 }

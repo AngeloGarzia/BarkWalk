@@ -45,6 +45,8 @@ public class BusinessSettingsService {
                 new DefaultSetting("30", "R16 Rappel expiration document J-30"));
         DEFAULTS.put(BusinessSettingsKeys.DOC_REMINDER_J7_DAYS,
                 new DefaultSetting("7", "R16 Rappel expiration document J-7"));
+        DEFAULTS.put(BusinessSettingsKeys.LIMIT_MESSAGES_PER_HOUR,
+                new DefaultSetting("60", "R13 Max messages / utilisateur / heure"));
     }
 
     private final SettingRepository settingRepository;

@@ -10,15 +10,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.barkwalk.common.AuditService;
 import com.barkwalk.common.Role;
 import com.barkwalk.storage.StorageService;
 import com.barkwalk.storage.StoredImage;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.domain.ProfilePhoto;
+import com.barkwalk.user.domain.User;
+import com.barkwalk.user.dto.ProfileDtos.ProfileUpdateRequest;
 import com.barkwalk.user.repository.ProfilePhotoRepository;
 import com.barkwalk.user.repository.ProfileRepository;
 import com.barkwalk.user.repository.UserRepository;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +49,8 @@ class ProfileServiceTest {
     private ProfilePhotoRepository photoRepository;
     @Mock
     private StorageService storageService;
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private ProfileService profileService;
@@ -52,6 +58,9 @@ class ProfileServiceTest {
     @BeforeEach
     void auth() {
         SecurityTestSupport.authenticate(1L, "alice@example.com", Role.USER);
+        org.mockito.Mockito.lenient()
+                .when(profileRepository.existsPseudoIgnoreCase(anyString(), anyLong()))
+                .thenReturn(false);
     }
 
     @AfterEach
@@ -102,6 +111,51 @@ class ProfileServiceTest {
     }
 
     @Test
+    void update_validatedSensitiveField_setsPending() {
+        Profile profile = profile(1L);
+        profile.setReviewStatus("VALIDATED");
+        profile.setPhone("0600000000");
+        profile.setCityId(10L);
+        User user = new User();
+        setId(user, 1L);
+        user.setEmail("alice@example.com");
+        user.setRoles(Set.of(Role.USER));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(profileRepository.findById(1L)).thenReturn(Optional.of(profile));
+        when(photoRepository.findByUserIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
+
+        var response = profileService.update(new ProfileUpdateRequest(
+                "Alice", "Martin", "AliceCanine", "0611111111", "Bio ok", 10L, null));
+
+        assertThat(response.reviewStatus()).isEqualTo("PENDING");
+        assertThat(response.phone()).isEqualTo("0611111111");
+        verify(auditService)
+                .log(eq(1L), eq("PROFILE_SENSITIVE_EDIT"), eq("PROFILE"), eq(1L), anyString());
+    }
+
+    @Test
+    void update_validatedBioOnly_keepsValidated() {
+        Profile profile = profile(1L);
+        profile.setReviewStatus("VALIDATED");
+        profile.setPhone("0600000000");
+        profile.setCityId(10L);
+        profile.setBio("Avant");
+        User user = new User();
+        setId(user, 1L);
+        user.setEmail("alice@example.com");
+        user.setRoles(Set.of(Role.USER));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(profileRepository.findById(1L)).thenReturn(Optional.of(profile));
+        when(photoRepository.findByUserIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
+
+        var response = profileService.update(new ProfileUpdateRequest(
+                "A", "B", "AliceCanine", "0600000000", "Nouvelle bio", 10L, null));
+
+        assertThat(response.reviewStatus()).isEqualTo("VALIDATED");
+        assertThat(response.bio()).isEqualTo("Nouvelle bio");
+    }
+
+    @Test
     void deletePhoto_reindexesAndSyncsLegacyKey() {
         Profile profile = profile(1L);
         profile.setPhotoKey("profiles/1/old.jpg");
@@ -130,6 +184,7 @@ class ProfileServiceTest {
         p.setUserId(userId);
         p.setFirstName("A");
         p.setLastName("B");
+        p.setReviewStatus("VALIDATED");
         return p;
     }
 

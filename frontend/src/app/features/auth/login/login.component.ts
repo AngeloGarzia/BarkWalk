@@ -34,9 +34,36 @@ import { AuthService } from '../../../core/auth.service';
         <div class="demo-hint">
           <p>Comptes démo (mot de passe <code>Admin123!</code>) :</p>
           <ul>
-            <li><button type="button" class="demo-fill" (click)="fillDemo('admin@barkwalk.fr')">admin@barkwalk.fr</button></li>
-            <li><button type="button" class="demo-fill" (click)="fillDemo('alice@example.com')">alice@example.com</button></li>
-            <li><button type="button" class="demo-fill" (click)="fillDemo('walker@barkwalk.fr')">walker@barkwalk.fr</button></li>
+            <li>
+              <button type="button" class="demo-fill" (click)="fillDemo('user@barkwalk.fr')">
+                user@barkwalk.fr — USER
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-fill" (click)="fillDemo('member@barkwalk.fr')">
+                member@barkwalk.fr — MEMBER
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-fill" (click)="fillDemo('org@barkwalk.fr')">
+                org@barkwalk.fr — COMMUNITY_ORG
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-fill" (click)="fillDemo('walker@barkwalk.fr')">
+                walker@barkwalk.fr — WALKER_STAFF
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-fill" (click)="fillDemo('indep@barkwalk.fr')">
+                indep@barkwalk.fr — WALKER_INDEP
+              </button>
+            </li>
+            <li>
+              <button type="button" class="demo-fill" (click)="fillDemo('admin@barkwalk.fr')">
+                admin@barkwalk.fr — ADMIN
+              </button>
+            </li>
           </ul>
         </div>
       </div>

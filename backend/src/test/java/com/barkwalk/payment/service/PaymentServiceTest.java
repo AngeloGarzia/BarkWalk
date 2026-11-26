@@ -102,7 +102,9 @@ class PaymentServiceTest {
         when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_2")).thenReturn(false);
         when(webhookEventRepository.save(any(WebhookEvent.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingService.confirmPayment(42L))
-                .thenReturn(new BookingResponse(42L, 1L, 2L, "CONFIRMED", 2000, true, Instant.now()));
+                .thenReturn(new BookingResponse(
+                        42L, 1L, 2L, "CONFIRMED", 2000, true, Instant.now(), null, false, false,
+                        null, null, null, null, null, null, null));
 
         Booking booking = new Booking();
         booking.setUserId(9L);
@@ -175,7 +177,9 @@ class PaymentServiceTest {
         when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_3")).thenReturn(false);
         when(webhookEventRepository.save(any(WebhookEvent.class))).thenAnswer(inv -> inv.getArgument(0));
         when(bookingService.confirmPayment(42L))
-                .thenReturn(new BookingResponse(42L, 1L, 2L, "CONFIRMED", 2000, true, Instant.now()));
+                .thenReturn(new BookingResponse(
+                        42L, 1L, 2L, "CONFIRMED", 2000, true, Instant.now(), null, false, false,
+                        null, null, null, null, null, null, null));
         Booking booking = new Booking();
         booking.setUserId(9L);
         booking.setWalkId(1L);

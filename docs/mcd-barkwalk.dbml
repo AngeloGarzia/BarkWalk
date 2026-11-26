@@ -110,6 +110,7 @@ Table profiles {
   user_id bigint [pk, ref: - users.id]
   first_name varchar(80) [not null]
   last_name varchar(80) [not null]
+  pseudo varchar(40) [note: 'public ; unique CI ; prioritaire à l''affichage tuiles']
   phone varchar(30)
   bio varchar(500)
   photo_key varchar(255) [note: 'legacy: clé de la 1re photo']
@@ -117,6 +118,8 @@ Table profiles {
   zone_id bigint [ref: > zones.id]
   community_org_status varchar(30) [not null, default: 'NONE', note: 'NONE|ELIGIBLE|ACTIVE|REVOKED']
   completed_walks_count int [not null, default: 0]
+  average_rating decimal(3,2) [note: 'moyenne notes balades créées']
+  ratings_count int [not null, default: 0]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 }
@@ -302,24 +305,46 @@ Table walks {
   description text
   starts_at timestamptz [not null]
   duration_minutes int [not null]
+  elevation_gain_m int [not null, default: 0, note: 'dénivelé + en mètres']
+  terrain_type varchar(30) [not null, default: 'FLAT', note: 'FLAT|PARK|FOREST|TRAIL|MOUNTAIN']
+  difficulty_level int [not null, default: 1, note: '1–10 calculé durée+dénivelé+terrain']
   capacity int [not null]
   allows_danger_categories boolean [not null, default: false, note: 'balade dédiée catégorie 1/2']
   price_cents int [not null, default: 0]
   non_member_price_cents int
   walker_id bigint [ref: > walker_profiles.id]
   organizer_user_id bigint [ref: > users.id]
-  status varchar(30) [not null, default: 'PUBLISHED', note: 'DRAFT|PUBLISHED|CANCELLED|COMPLETED']
+  status varchar(30) [not null, default: 'PUBLISHED', note: 'DRAFT|PUBLISHED|IN_PROGRESS|CANCELLED|COMPLETED']
   accepted_sizes text[] [not null, note: 'SMALL|MEDIUM|LARGE']
   accepted_energy text[] [not null, note: 'LOW|MEDIUM|HIGH']
   min_sociability_dogs varchar(20)
   route_hint text
+  route_geojson jsonb [note: 'GeoJSON LineString coordinates [lng,lat]']
+  started_at timestamptz
+  completed_at timestamptz
   cancelled_by_user_id bigint [ref: > users.id]
   cancellation_reason text
+  archived_at timestamptz [note: 'archivage soft ; suppression hard admin seule']
+  recycled_from_walk_id bigint [ref: > walks.id, note: 'recyclage : nouvelle édition liée à une balade passée']
   recurrence_rule_id bigint [ref: > walk_recurrence_rules.id]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
 
-  Note: 'COMMUNITY => capacity<=8 + organizer; STAFF_GUIDED => walker requis'
+  Note: 'COMMUNITY => capacity<=8 + organizer; STAFF_GUIDED => walker requis; difficulté = f(durée, dénivelé, terrain); archivées, suppression = admin'
+}
+
+Table walk_photos {
+  id bigint [pk, increment]
+  walk_id bigint [not null, ref: > walks.id]
+  uploaded_by bigint [not null, ref: > users.id]
+  storage_key varchar(255) [not null]
+  content_type varchar(80) [not null, default: 'image/jpeg']
+  kind varchar(20) [not null, note: 'PROMO|GALLERY']
+  sort_order smallint [not null, default: 0]
+  caption varchar(240)
+  created_at timestamptz [not null]
+
+  Note: 'PROMO max 6 (créateur) ; GALLERY max 20 (org + participants)'
 }
 
 Table walk_recurrence_rules {
@@ -492,6 +517,18 @@ Table reviews {
   updated_at timestamptz [not null]
 
   Note: 'UNIQUE(walk_id, author_id, target_user_id); fenêtre 14j via trigger'
+}
+
+Table walk_ratings {
+  id bigint [pk, increment]
+  walk_id bigint [not null, ref: > walks.id]
+  user_id bigint [not null, ref: > users.id]
+  rating int [not null, note: '1..5 étoiles']
+  comment text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'UNIQUE(walk_id, user_id); ouvert dès le lendemain, fermé à starts_at + review_window_days'
 }
 
 Table reports {

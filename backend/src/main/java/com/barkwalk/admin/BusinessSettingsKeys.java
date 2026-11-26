@@ -16,4 +16,5 @@ public final class BusinessSettingsKeys {
     public static final String ORG_MIN_REVIEWS = "org_min_reviews";
     public static final String DOC_REMINDER_J30_DAYS = "doc_reminder_j30_days";
     public static final String DOC_REMINDER_J7_DAYS = "doc_reminder_j7_days";
+    public static final String LIMIT_MESSAGES_PER_HOUR = "limit_messages_per_hour";
 }

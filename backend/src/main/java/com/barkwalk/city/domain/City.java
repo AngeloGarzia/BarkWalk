@@ -45,31 +45,63 @@ public class City {
         return inseeCode;
     }
 
+    public void setInseeCode(String inseeCode) {
+        this.inseeCode = inseeCode;
+    }
+
     public String getPostalCode() {
         return postalCode;
+    }
+
+    public void setPostalCode(String postalCode) {
+        this.postalCode = postalCode;
     }
 
     public String getName() {
         return name;
     }
 
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public String getDepartment() {
         return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
     }
 
     public String getRegion() {
         return region;
     }
 
+    public void setRegion(String region) {
+        this.region = region;
+    }
+
     public Double getLat() {
         return lat;
+    }
+
+    public void setLat(Double lat) {
+        this.lat = lat;
     }
 
     public Double getLng() {
         return lng;
     }
 
+    public void setLng(Double lng) {
+        this.lng = lng;
+    }
+
     public boolean isActive() {
         return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

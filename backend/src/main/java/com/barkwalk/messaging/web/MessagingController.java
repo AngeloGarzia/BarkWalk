@@ -4,6 +4,7 @@ import com.barkwalk.messaging.dto.MessagingDtos.ConversationResponse;
 import com.barkwalk.messaging.dto.MessagingDtos.CreateConversationRequest;
 import com.barkwalk.messaging.dto.MessagingDtos.MessageRequest;
 import com.barkwalk.messaging.dto.MessagingDtos.MessageResponse;
+import com.barkwalk.messaging.dto.MessagingDtos.OpenDirectRequest;
 import com.barkwalk.messaging.service.MessagingService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -29,6 +30,11 @@ public class MessagingController {
         return messagingService.create(request);
     }
 
+    @PostMapping("/conversations/direct")
+    public ConversationResponse openDirect(@Valid @RequestBody OpenDirectRequest request) {
+        return messagingService.openDirect(request);
+    }
+
     @GetMapping("/conversations/{id}/messages")
     public List<MessageResponse> messages(@PathVariable Long id) {
         return messagingService.messages(id);
@@ -37,6 +43,11 @@ public class MessagingController {
     @PostMapping("/conversations/{id}/messages")
     public MessageResponse post(@PathVariable Long id, @Valid @RequestBody MessageRequest request) {
         return messagingService.post(id, request);
+    }
+
+    @PostMapping("/conversations/{id}/read")
+    public ConversationResponse markRead(@PathVariable Long id) {
+        return messagingService.markRead(id);
     }
 
     @PostMapping("/blocks/{userId}")

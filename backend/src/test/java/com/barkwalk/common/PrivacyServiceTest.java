@@ -102,6 +102,20 @@ class PrivacyServiceTest {
         assertThat(privacyService.displayName(4L)).isEqualTo("Alice Martin");
     }
 
+    @Test
+    void displayName_prefersPseudo() {
+        User user = new User();
+        setId(user, 5L);
+        user.setDeleted(false);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        Profile profile = new Profile();
+        profile.setFirstName("Alice");
+        profile.setLastName("Martin");
+        profile.setPseudo("AliceCanine");
+        when(profileRepository.findById(5L)).thenReturn(Optional.of(profile));
+        assertThat(privacyService.displayName(5L)).isEqualTo("AliceCanine");
+    }
+
     private static void setId(Object entity, long id) {
         try {
             var f = entity.getClass().getDeclaredField("id");

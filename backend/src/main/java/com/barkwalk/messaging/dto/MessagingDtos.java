@@ -10,9 +10,23 @@ public final class MessagingDtos {
 
     public record CreateConversationRequest(@NotBlank String type, @NotNull List<Long> memberIds, Long walkId) {}
 
+    public record OpenDirectRequest(@NotNull Long userId) {}
+
     public record MessageRequest(@NotBlank String body) {}
 
-    public record ConversationResponse(Long id, String conversationType, Long walkId, Instant createdAt, Instant archivedAt) {}
+    public record MemberSummary(Long userId, String displayName) {}
+
+    public record ConversationResponse(
+            Long id,
+            String conversationType,
+            Long walkId,
+            String title,
+            String lastMessagePreview,
+            Instant lastMessageAt,
+            int unreadCount,
+            Instant createdAt,
+            Instant archivedAt,
+            List<MemberSummary> members) {}
 
     public record MessageResponse(
             Long id,

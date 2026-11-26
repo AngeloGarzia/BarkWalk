@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 
 // Profil nominal (coordonnées, ville, statut organisateur communautaire).
@@ -20,6 +21,10 @@ public class Profile {
 
     @Column(name = "last_name", nullable = false)
     private String lastName;
+
+    /** Pseudo public optionnel (tuiles balades créées / participées). */
+    @Column(length = 40)
+    private String pseudo;
 
     private String phone;
     private String bio;
@@ -38,6 +43,20 @@ public class Profile {
 
     @Column(name = "completed_walks_count", nullable = false)
     private int completedWalksCount;
+
+    /** Moyenne des notes reçues sur les balades créées (1–5). */
+    @Column(name = "average_rating")
+    private BigDecimal averageRating;
+
+    @Column(name = "ratings_count", nullable = false)
+    private int ratingsCount;
+
+    /** DRAFT | PENDING | VALIDATED | REFUSED — revalidation si champs sensibles modifiés. */
+    @Column(name = "review_status", nullable = false)
+    private String reviewStatus = "VALIDATED";
+
+    @Column(name = "review_refusal_reason")
+    private String reviewRefusalReason;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
@@ -67,6 +86,14 @@ public class Profile {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public String getPseudo() {
+        return pseudo;
+    }
+
+    public void setPseudo(String pseudo) {
+        this.pseudo = pseudo;
     }
 
     public String getPhone() {
@@ -131,6 +158,38 @@ public class Profile {
 
     public void setCompletedWalksCount(int completedWalksCount) {
         this.completedWalksCount = completedWalksCount;
+    }
+
+    public BigDecimal getAverageRating() {
+        return averageRating;
+    }
+
+    public void setAverageRating(BigDecimal averageRating) {
+        this.averageRating = averageRating;
+    }
+
+    public int getRatingsCount() {
+        return ratingsCount;
+    }
+
+    public void setRatingsCount(int ratingsCount) {
+        this.ratingsCount = ratingsCount;
+    }
+
+    public String getReviewStatus() {
+        return reviewStatus;
+    }
+
+    public void setReviewStatus(String reviewStatus) {
+        this.reviewStatus = reviewStatus;
+    }
+
+    public String getReviewRefusalReason() {
+        return reviewRefusalReason;
+    }
+
+    public void setReviewRefusalReason(String reviewRefusalReason) {
+        this.reviewRefusalReason = reviewRefusalReason;
     }
 
     public Instant getCreatedAt() {

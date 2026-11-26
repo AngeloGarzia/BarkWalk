@@ -4,10 +4,12 @@ import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.domain.WaitlistEntry;
 import com.barkwalk.booking.dto.BookingDtos.BookingResponse;
+import com.barkwalk.booking.dto.BookingDtos.WaitlistEntryResponse;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
 import com.barkwalk.common.NotificationService;
 import com.barkwalk.common.SecurityUtils;
+import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import java.time.Duration;
@@ -26,18 +28,31 @@ public class WaitlistService {
     private final WalkRepository walkRepository;
     private final BusinessSettingsService businessSettingsService;
     private final NotificationService notificationService;
+    private final BookingResponseFactory bookingResponseFactory;
+    private final MessagingService messagingService;
 
     public WaitlistService(
             WaitlistEntryRepository waitlistEntryRepository,
             BookingRepository bookingRepository,
             WalkRepository walkRepository,
             BusinessSettingsService businessSettingsService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            BookingResponseFactory bookingResponseFactory,
+            MessagingService messagingService) {
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.bookingRepository = bookingRepository;
         this.walkRepository = walkRepository;
         this.businessSettingsService = businessSettingsService;
         this.notificationService = notificationService;
+        this.bookingResponseFactory = bookingResponseFactory;
+        this.messagingService = messagingService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<WaitlistEntryResponse> mine() {
+        return waitlistEntryRepository.findByUserIdOrderByCreatedAtDesc(SecurityUtils.currentUserId()).stream()
+                .map(bookingResponseFactory::from)
+                .toList();
     }
 
     @Transactional
@@ -101,14 +116,8 @@ public class WaitlistService {
         booking = bookingRepository.save(booking);
         entry.setStatus("ACCEPTED");
         waitlistEntryRepository.save(entry);
-        return new BookingResponse(
-                booking.getId(),
-                booking.getWalkId(),
-                booking.getDogId(),
-                booking.getStatus(),
-                booking.getPriceCents(),
-                booking.isPaymentRequired(),
-                booking.getConfirmedAt());
+        messagingService.addMemberToWalkThread(booking.getWalkId(), booking.getUserId());
+        return bookingResponseFactory.from(booking, walk, null);
     }
 
     @Transactional

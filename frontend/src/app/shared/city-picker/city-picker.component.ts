@@ -23,10 +23,10 @@ import { CityService, City } from '../city.service';
       <input
         [formControl]="searchCtrl"
         type="text"
-        placeholder="Chercher une ville…"
+        placeholder="Ville ou code postal…"
         autocomplete="off"
         class="city-input"
-        aria-label="Rechercher une ville"
+        aria-label="Rechercher une ville ou un code postal"
       />
       @if (results().length > 0) {
         <ul class="city-dropdown" role="listbox">
@@ -116,9 +116,19 @@ export class CityPickerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.sub = this.searchCtrl.valueChanges
       .pipe(
-        debounceTime(300),
+        debounceTime(280),
         distinctUntilChanged(),
-        switchMap((q) => (q && q.length >= 2 ? this.cityService.search(q) : of([]))),
+        switchMap((q) => {
+          const query = (q ?? '').trim();
+          if (!query) {
+            return of([]);
+          }
+          // CP : dès 2 chiffres ; nom de ville : dès 2 lettres.
+          if (query.length < 2) {
+            return of([]);
+          }
+          return this.cityService.search(query);
+        }),
         catchError(() => of([])),
       )
       .subscribe((cities) => this.results.set(cities));

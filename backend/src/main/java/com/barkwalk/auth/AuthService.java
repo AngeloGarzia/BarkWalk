@@ -75,6 +75,7 @@ public class AuthService {
         profile.setLastName(request.lastName());
         profile.setCityId(request.cityId());
         profile.setCommunityOrgStatus("NONE");
+        profile.setReviewStatus("VALIDATED");
         profileRepository.save(profile);
         return issueTokens(user);
     }

@@ -1,5 +1,7 @@
 package com.barkwalk.user.service;
 
+import com.barkwalk.common.AuditService;
+import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.storage.StorageService;
 import com.barkwalk.storage.StorageTx;
@@ -15,6 +17,7 @@ import com.barkwalk.user.repository.ProfileRepository;
 import com.barkwalk.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,25 +25,29 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-// Lecture / mise à jour du profil + 1 à 3 photos.
+// Lecture / mise à jour du profil + 1 à 3 photos + revue admin identité.
 @Service
 public class ProfileService {
     private static final int MAX_PHOTOS = 3;
+    private static final String SENSITIVE_EDIT_AUDIT = "PROFILE_SENSITIVE_EDIT";
 
     private final ProfileRepository profileRepository;
     private final UserRepository userRepository;
     private final ProfilePhotoRepository photoRepository;
     private final StorageService storageService;
+    private final AuditService auditService;
 
     public ProfileService(
             ProfileRepository profileRepository,
             UserRepository userRepository,
             ProfilePhotoRepository photoRepository,
-            StorageService storageService) {
+            StorageService storageService,
+            AuditService auditService) {
         this.profileRepository = profileRepository;
         this.userRepository = userRepository;
         this.photoRepository = photoRepository;
         this.storageService = storageService;
+        this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
@@ -57,13 +64,73 @@ public class ProfileService {
         Long id = SecurityUtils.currentUserId();
         User user = userRepository.findById(id).orElseThrow();
         Profile profile = profileRepository.findById(id).orElseThrow();
+        boolean wasValidated = "VALIDATED".equals(profile.getReviewStatus());
+        boolean wasRefused = "REFUSED".equals(profile.getReviewStatus());
+        boolean sensitiveChanged = sensitiveFieldsChanged(profile, request);
+
         profile.setFirstName(request.firstName());
         profile.setLastName(request.lastName());
+        profile.setPseudo(normalizePseudo(request.pseudo(), id));
         profile.setPhone(request.phone());
         profile.setBio(request.bio());
         profile.setCityId(request.cityId());
         profile.setZoneId(request.zoneId());
         profile.setUpdatedAt(Instant.now());
+
+        if ((wasValidated && sensitiveChanged) || (wasRefused && sensitiveChanged)) {
+            profile.setReviewStatus("PENDING");
+            profile.setReviewRefusalReason(null);
+            auditService.log(
+                    id,
+                    SENSITIVE_EDIT_AUDIT,
+                    "PROFILE",
+                    id,
+                    "Modification sensible — revalidation admin requise");
+        }
+
+        return toResponse(user, profile);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProfileResponse> pendingReviews() {
+        requireAdmin();
+        return profileRepository.findByReviewStatusOrderByUpdatedAtAsc("PENDING").stream()
+                .map(profile -> {
+                    User user = userRepository.findById(profile.getUserId()).orElse(null);
+                    if (user == null) {
+                        return null;
+                    }
+                    return toResponse(user, profile);
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Transactional
+    public ProfileResponse validateReview(Long userId) {
+        requireAdmin();
+        Profile profile = profileRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        profile.setReviewStatus("VALIDATED");
+        profile.setReviewRefusalReason(null);
+        profile.setUpdatedAt(Instant.now());
+        auditService.log(SecurityUtils.currentUserId(), "PROFILE_VALIDATE", "PROFILE", userId, null);
+        return toResponse(user, profile);
+    }
+
+    @Transactional
+    public ProfileResponse refuseReview(Long userId, String reason) {
+        requireAdmin();
+        Profile profile = profileRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        profile.setReviewStatus("REFUSED");
+        profile.setReviewRefusalReason(reason);
+        profile.setUpdatedAt(Instant.now());
+        auditService.log(SecurityUtils.currentUserId(), "PROFILE_REFUSE", "PROFILE", userId, reason);
         return toResponse(user, profile);
     }
 
@@ -109,6 +176,44 @@ public class ProfileService {
         StorageTx.deleteAfterCommit(storageService, key);
     }
 
+    /**
+     * Sensibles : prénom, nom, téléphone, ville, zone.
+     * Libres : bio, pseudo (et photos via endpoints dédiés).
+     */
+    static boolean sensitiveFieldsChanged(Profile profile, ProfileUpdateRequest request) {
+        return !Objects.equals(normalize(profile.getFirstName()), normalize(request.firstName()))
+                || !Objects.equals(normalize(profile.getLastName()), normalize(request.lastName()))
+                || !Objects.equals(normalize(profile.getPhone()), normalize(request.phone()))
+                || !Objects.equals(profile.getCityId(), request.cityId())
+                || !Objects.equals(profile.getZoneId(), request.zoneId());
+    }
+
+    private String normalizePseudo(String raw, Long userId) {
+        String pseudo = normalize(raw);
+        if (pseudo == null) {
+            return null;
+        }
+        if (pseudo.length() < 3) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pseudo must be at least 3 characters");
+        }
+        if (!pseudo.matches("^[\\p{L}\\p{N}_.-]+$")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Pseudo may only contain letters, digits, _ . -");
+        }
+        if (profileRepository.existsPseudoIgnoreCase(pseudo, userId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pseudo already taken");
+        }
+        return pseudo;
+    }
+
+    private static String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private void reindex(Long userId) {
         List<ProfilePhoto> remaining = photoRepository.findByUserIdOrderBySortOrderAsc(userId);
         short order = 0;
@@ -144,18 +249,29 @@ public class ProfileService {
         profile.setUpdatedAt(Instant.now());
     }
 
+    private void requireAdmin() {
+        if (!SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+    }
+
     private ProfileResponse toResponse(User user, Profile profile) {
         return new ProfileResponse(
                 user.getId(),
                 user.getEmail(),
                 profile.getFirstName(),
                 profile.getLastName(),
+                profile.getPseudo(),
                 profile.getPhone(),
                 profile.getBio(),
                 profile.getCityId(),
                 profile.getZoneId(),
                 profile.getCompletedWalksCount(),
+                profile.getAverageRating(),
+                profile.getRatingsCount(),
                 profile.getCommunityOrgStatus(),
+                profile.getReviewStatus(),
+                profile.getReviewRefusalReason(),
                 user.getRoles().stream().map(Enum::name).collect(Collectors.toSet()),
                 listPhotosFor(user.getId()));
     }

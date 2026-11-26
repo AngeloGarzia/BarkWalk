@@ -17,6 +17,7 @@ import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.common.NotificationService;
 import com.barkwalk.dog.service.DogDossierService;
+import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.payment.repository.PaymentRepository;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
@@ -60,6 +61,10 @@ class BookingServiceTest {
     private WalkerProfileRepository walkerProfileRepository;
     @Mock
     private WaitlistService waitlistService;
+    @Mock
+    private BookingResponseFactory bookingResponseFactory;
+    @Mock
+    private MessagingService messagingService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -75,6 +80,29 @@ class BookingServiceTest {
         org.mockito.Mockito.lenient().when(businessSettingsService.pendingPaymentMinutes()).thenReturn(15);
         org.mockito.Mockito.lenient().when(businessSettingsService.cancellationFreeHours()).thenReturn(24);
         org.mockito.Mockito.lenient().doNothing().when(waitlistService).offerNext(org.mockito.ArgumentMatchers.anyLong());
+        org.mockito.Mockito.lenient()
+                .when(bookingResponseFactory.from(org.mockito.ArgumentMatchers.any(Booking.class)))
+                .thenAnswer(inv -> {
+                    Booking b = inv.getArgument(0);
+                    return new com.barkwalk.booking.dto.BookingDtos.BookingResponse(
+                            b.getId(),
+                            b.getWalkId(),
+                            b.getDogId(),
+                            b.getStatus(),
+                            b.getPriceCents(),
+                            b.isPaymentRequired(),
+                            b.getConfirmedAt(),
+                            b.getPaymentExpiresAt(),
+                            b.isTrial(),
+                            b.isCommunityAck(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null);
+                });
     }
 
     @AfterEach
@@ -221,10 +249,14 @@ class BookingServiceTest {
     void confirmPayment_setsConfirmed() {
         Booking booking = new Booking();
         booking.setStatus("PENDING_PAYMENT");
+        booking.setWalkId(10L);
+        booking.setUserId(1L);
         when(bookingRepository.findById(8L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
         var response = bookingService.confirmPayment(8L);
         assertThat(response.status()).isEqualTo("CONFIRMED");
         assertThat(booking.getConfirmedAt()).isNotNull();
+        verify(messagingService).addMemberToWalkThread(10L, 1L);
     }
 
     @Test

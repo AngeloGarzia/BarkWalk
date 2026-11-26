@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Map;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -39,6 +40,18 @@ public class Walk {
     @Column(name = "duration_minutes", nullable = false)
     private int durationMinutes;
 
+    /** Dénivelé positif approximatif (mètres). */
+    @Column(name = "elevation_gain_m", nullable = false)
+    private int elevationGainM;
+
+    /** FLAT | PARK | FOREST | TRAIL | MOUNTAIN */
+    @Column(name = "terrain_type", nullable = false)
+    private String terrainType = "FLAT";
+
+    /** Score 1–10 dérivé durée + dénivelé + terrain. */
+    @Column(name = "difficulty_level", nullable = false)
+    private int difficultyLevel = 1;
+
     @Column(nullable = false)
     private int capacity;
 
@@ -56,6 +69,12 @@ public class Walk {
 
     @Column(nullable = false)
     private String status = "PUBLISHED";
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "accepted_sizes", nullable = false, columnDefinition = "text[]")
@@ -75,11 +94,24 @@ public class Walk {
     @Column(name = "route_hint")
     private String routeHint;
 
+    /** GeoJSON LineString (coordinates [lng, lat]). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "route_geojson", columnDefinition = "jsonb")
+    private Map<String, Object> routeGeojson;
+
     @Column(name = "cancelled_by_user_id")
     private Long cancelledByUserId;
 
     @Column(name = "cancellation_reason")
     private String cancellationReason;
+
+    /** Présente dès qu'une balade est terminée, annulée ou archivée manuellement. */
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    /** Balade passée dont celle-ci est un recyclage. */
+    @Column(name = "recycled_from_walk_id")
+    private Long recycledFromWalkId;
 
     @Column(name = "recurrence_rule_id")
     private Long recurrenceRuleId;
@@ -150,6 +182,30 @@ public class Walk {
         this.durationMinutes = durationMinutes;
     }
 
+    public int getElevationGainM() {
+        return elevationGainM;
+    }
+
+    public void setElevationGainM(int elevationGainM) {
+        this.elevationGainM = elevationGainM;
+    }
+
+    public String getTerrainType() {
+        return terrainType;
+    }
+
+    public void setTerrainType(String terrainType) {
+        this.terrainType = terrainType;
+    }
+
+    public int getDifficultyLevel() {
+        return difficultyLevel;
+    }
+
+    public void setDifficultyLevel(int difficultyLevel) {
+        this.difficultyLevel = difficultyLevel;
+    }
+
     public int getCapacity() {
         return capacity;
     }
@@ -198,6 +254,22 @@ public class Walk {
         this.status = status;
     }
 
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public void setStartedAt(Instant startedAt) {
+        this.startedAt = startedAt;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(Instant completedAt) {
+        this.completedAt = completedAt;
+    }
+
     public String[] getAcceptedSizes() {
         return acceptedSizes;
     }
@@ -238,6 +310,14 @@ public class Walk {
         this.routeHint = routeHint;
     }
 
+    public Map<String, Object> getRouteGeojson() {
+        return routeGeojson;
+    }
+
+    public void setRouteGeojson(Map<String, Object> routeGeojson) {
+        this.routeGeojson = routeGeojson;
+    }
+
     // Disclaimer communautaire : dérivé du type, plus de colonne dédiée en base.
     public boolean isCommunityDisclaimerRequired() {
         return "COMMUNITY".equals(walkType);
@@ -257,6 +337,22 @@ public class Walk {
 
     public void setCancellationReason(String cancellationReason) {
         this.cancellationReason = cancellationReason;
+    }
+
+    public Instant getArchivedAt() {
+        return archivedAt;
+    }
+
+    public void setArchivedAt(Instant archivedAt) {
+        this.archivedAt = archivedAt;
+    }
+
+    public Long getRecycledFromWalkId() {
+        return recycledFromWalkId;
+    }
+
+    public void setRecycledFromWalkId(Long recycledFromWalkId) {
+        this.recycledFromWalkId = recycledFromWalkId;
     }
 
     public Long getRecurrenceRuleId() {

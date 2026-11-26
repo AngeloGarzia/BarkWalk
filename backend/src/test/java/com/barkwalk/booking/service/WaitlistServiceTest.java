@@ -14,6 +14,7 @@ import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
 import com.barkwalk.common.NotificationService;
 import com.barkwalk.common.Role;
+import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
@@ -43,6 +44,10 @@ class WaitlistServiceTest {
     private BusinessSettingsService businessSettingsService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private BookingResponseFactory bookingResponseFactory;
+    @Mock
+    private MessagingService messagingService;
 
     @InjectMocks
     private WaitlistService waitlistService;
@@ -50,6 +55,33 @@ class WaitlistServiceTest {
     @AfterEach
     void clear() {
         SecurityTestSupport.clear();
+    }
+
+    @org.junit.jupiter.api.BeforeEach
+    void stubFactory() {
+        org.mockito.Mockito.lenient()
+                .when(bookingResponseFactory.from(any(Booking.class), any(), org.mockito.ArgumentMatchers.nullable(String.class)))
+                .thenAnswer(inv -> {
+                    Booking b = inv.getArgument(0);
+                    return new com.barkwalk.booking.dto.BookingDtos.BookingResponse(
+                            b.getId(),
+                            b.getWalkId(),
+                            b.getDogId(),
+                            b.getStatus(),
+                            b.getPriceCents(),
+                            b.isPaymentRequired(),
+                            b.getConfirmedAt(),
+                            b.getPaymentExpiresAt(),
+                            b.isTrial(),
+                            b.isCommunityAck(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null);
+                });
     }
 
     @Test

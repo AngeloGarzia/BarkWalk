@@ -44,6 +44,25 @@ function rolesFromJwt(token: string | null): string[] {
   return [];
 }
 
+function userIdFromJwt(token: string | null): number | null {
+  if (!token) {
+    return null;
+  }
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
+    return null;
+  }
+  const sub = payload['sub'];
+  if (typeof sub === 'number' && Number.isFinite(sub)) {
+    return sub;
+  }
+  if (typeof sub === 'string') {
+    const id = Number(sub);
+    return Number.isFinite(id) ? id : null;
+  }
+  return null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
@@ -51,6 +70,7 @@ export class AuthService {
   private _token: string | null = localStorage.getItem(ACCESS_KEY);
   readonly loggedIn = signal(!!this._token);
   readonly roles = signal<string[]>(rolesFromJwt(this._token));
+  readonly userId = signal<number | null>(userIdFromJwt(this._token));
 
   /** Shared in-flight refresh so concurrent 401s only rotate once. */
   private refresh$?: Observable<AuthResponse>;
@@ -117,6 +137,7 @@ export class AuthService {
     this._token = null;
     this.loggedIn.set(false);
     this.roles.set([]);
+    this.userId.set(null);
     this.refresh$ = undefined;
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
@@ -127,6 +148,7 @@ export class AuthService {
     this.loggedIn.set(true);
     const fromResponse = res.roles ?? [];
     this.roles.set(fromResponse.length ? fromResponse : rolesFromJwt(res.accessToken));
+    this.userId.set(userIdFromJwt(res.accessToken));
     localStorage.setItem(ACCESS_KEY, res.accessToken);
     localStorage.setItem(REFRESH_KEY, res.refreshToken);
   }

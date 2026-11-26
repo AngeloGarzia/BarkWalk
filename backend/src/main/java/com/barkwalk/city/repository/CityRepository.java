@@ -14,6 +14,8 @@ import jakarta.persistence.LockModeType;
 // Recherche textuelle sur communes.
 
 public interface CityRepository extends JpaRepository<City, Long> {
+    Optional<City> findByInseeCodeAndPostalCode(String inseeCode, String postalCode);
+
     @Query("""
             SELECT c FROM City c
             WHERE c.active = true AND (
@@ -22,5 +24,5 @@ public interface CityRepository extends JpaRepository<City, Long> {
             )
             ORDER BY c.name, c.postalCode
             """)
-        List<City> search(@Param("q") String q, Pageable pageable);
+    List<City> search(@Param("q") String q, Pageable pageable);
 }

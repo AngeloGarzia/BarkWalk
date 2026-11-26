@@ -70,7 +70,14 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/cities/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/walks/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/walks/mine").authenticated()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/walks",
+                                "/api/walks/*",
+                                "/api/walks/*/photos",
+                                "/api/walks/*/history")
+                        .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/memberships/plans").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers("/api/payments/webhook").permitAll()

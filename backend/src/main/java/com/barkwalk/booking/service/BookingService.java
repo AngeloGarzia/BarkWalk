@@ -15,6 +15,7 @@ import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.payment.domain.Payment;
 import com.barkwalk.payment.repository.PaymentRepository;
+import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.service.DogWalkCompatibilityService;
@@ -42,6 +43,8 @@ public class BookingService {
     private final NotificationService notificationService;
     private final WalkerProfileRepository walkerProfileRepository;
     private final WaitlistService waitlistService;
+    private final BookingResponseFactory bookingResponseFactory;
+    private final MessagingService messagingService;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -54,7 +57,9 @@ public class BookingService {
             PaymentRepository paymentRepository,
             NotificationService notificationService,
             WalkerProfileRepository walkerProfileRepository,
-            @Lazy WaitlistService waitlistService) {
+            @Lazy WaitlistService waitlistService,
+            BookingResponseFactory bookingResponseFactory,
+            MessagingService messagingService) {
         this.bookingRepository = bookingRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.walkRepository = walkRepository;
@@ -66,6 +71,8 @@ public class BookingService {
         this.notificationService = notificationService;
         this.walkerProfileRepository = walkerProfileRepository;
         this.waitlistService = waitlistService;
+        this.bookingResponseFactory = bookingResponseFactory;
+        this.messagingService = messagingService;
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
@@ -152,6 +159,9 @@ public class BookingService {
             booking.setConfirmedAt(Instant.now());
         }
         booking = bookingRepository.save(booking);
+        if ("CONFIRMED".equals(booking.getStatus())) {
+            messagingService.addMemberToWalkThread(booking.getWalkId(), booking.getUserId());
+        }
         return toResponse(booking);
     }
 
@@ -259,6 +269,8 @@ public class BookingService {
         }
         booking.setStatus("CONFIRMED");
         booking.setConfirmedAt(Instant.now());
+        bookingRepository.save(booking);
+        messagingService.addMemberToWalkThread(booking.getWalkId(), booking.getUserId());
         return toResponse(booking);
     }
 
@@ -280,7 +292,6 @@ public class BookingService {
     }
 
     private BookingResponse toResponse(Booking b) {
-        return new BookingResponse(b.getId(), b.getWalkId(), b.getDogId(), b.getStatus(),
-                b.getPriceCents(), b.isPaymentRequired(), b.getConfirmedAt());
+        return bookingResponseFactory.from(b);
     }
 }

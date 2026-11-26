@@ -3,10 +3,12 @@ package com.barkwalk.walk.service;
 import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
+import com.barkwalk.booking.repository.WaitlistEntryRepository;
 import com.barkwalk.common.PrivacyService;
 import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.review.repository.WalkRatingRepository;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.repository.ProfileRepository;
 import com.barkwalk.city.domain.City;
@@ -15,16 +17,26 @@ import com.barkwalk.walk.domain.MeetingPoint;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
+import com.barkwalk.messaging.service.MessagingService;
+import com.barkwalk.review.domain.WalkRating;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
+import com.barkwalk.walk.dto.WalkDtos.WalkRecycleRequest;
 import com.barkwalk.walk.dto.WalkDtos.WalkResponse;
+import com.barkwalk.walk.dto.WalkDtos.WalkUpdateRequest;
 import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantResponse;
 import com.barkwalk.walk.dto.WalkParticipantDtos.ParticipantsResponse;
+import com.barkwalk.walk.dto.WalkPhotoDtos.WalkHistoryComment;
+import com.barkwalk.walk.dto.WalkPhotoDtos.WalkHistoryResponse;
+import com.barkwalk.walk.dto.WalkPhotoDtos.WalkPhotoResponse;
 import com.barkwalk.walker.domain.WalkerProfile;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
 import com.barkwalk.walker.service.WalkerPublishEligibility;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -34,6 +46,9 @@ import org.springframework.web.server.ResponseStatusException;
 // Catalogue et création de balades (encadrées ou communautaires).
 @Service
 public class WalkService {
+    private static final int ROUTE_MIN_POINTS = 2;
+    private static final int ROUTE_MAX_POINTS = 50;
+
     private final WalkRepository walkRepository;
     private final MeetingPointRepository meetingPointRepository;
     private final CityRepository cityRepository;
@@ -44,6 +59,11 @@ public class WalkService {
     private final DogRepository dogRepository;
     private final WalkerProfileRepository walkerProfileRepository;
     private final WalkerPublishEligibility walkerPublishEligibility;
+    private final WalkDifficultyCalculator difficultyCalculator;
+    private final WaitlistEntryRepository waitlistEntryRepository;
+    private final WalkRatingRepository walkRatingRepository;
+    private final WalkPhotoService walkPhotoService;
+    private final MessagingService messagingService;
 
     public WalkService(
             WalkRepository walkRepository,
@@ -55,7 +75,12 @@ public class WalkService {
             PrivacyService privacyService,
             DogRepository dogRepository,
             WalkerProfileRepository walkerProfileRepository,
-            WalkerPublishEligibility walkerPublishEligibility) {
+            WalkerPublishEligibility walkerPublishEligibility,
+            WalkDifficultyCalculator difficultyCalculator,
+            WaitlistEntryRepository waitlistEntryRepository,
+            WalkRatingRepository walkRatingRepository,
+            WalkPhotoService walkPhotoService,
+            MessagingService messagingService) {
         this.walkRepository = walkRepository;
         this.meetingPointRepository = meetingPointRepository;
         this.cityRepository = cityRepository;
@@ -66,6 +91,11 @@ public class WalkService {
         this.dogRepository = dogRepository;
         this.walkerProfileRepository = walkerProfileRepository;
         this.walkerPublishEligibility = walkerPublishEligibility;
+        this.difficultyCalculator = difficultyCalculator;
+        this.waitlistEntryRepository = waitlistEntryRepository;
+        this.walkRatingRepository = walkRatingRepository;
+        this.walkPhotoService = walkPhotoService;
+        this.messagingService = messagingService;
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +110,14 @@ public class WalkService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)));
     }
 
+    // Balades dont l'utilisateur est organisateur (créateur) ou encadrant assigné.
+    @Transactional(readOnly = true)
+    public List<WalkResponse> mine() {
+        Long userId = SecurityUtils.currentUserId();
+        Long walkerId = walkerProfileRepository.findByUserId(userId).map(WalkerProfile::getId).orElse(null);
+        return walkRepository.findMine(userId, walkerId).stream().map(this::toResponse).toList();
+    }
+
     // Communautaire : organisateur éligible ou actif. Encadrée : staff / indépendant / admin.
     @Transactional
     public WalkResponse create(WalkCreateRequest request) {
@@ -92,7 +130,9 @@ public class WalkService {
             Profile profile = profileRepository.findById(principal.getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST));
             int threshold = businessSettingsService.communityWalksThreshold();
-            boolean orgOk = "ACTIVE".equals(profile.getCommunityOrgStatus())
+            boolean orgRole = roles.contains(Role.COMMUNITY_ORG);
+            boolean orgOk = orgRole
+                    || "ACTIVE".equals(profile.getCommunityOrgStatus())
                     || ("ELIGIBLE".equals(profile.getCommunityOrgStatus())
                             && profile.getCompletedWalksCount() >= threshold);
             if (!admin && (!orgOk || profile.isCommunityOrgRevoked())) {
@@ -126,13 +166,13 @@ public class WalkService {
         walk.setDescription(request.description());
         walk.setStartsAt(request.startsAt());
         walk.setDurationMinutes(request.durationMinutes());
+        applyDifficultyInputs(walk, request.durationMinutes(), request.elevationGainM(), request.terrainType());
         walk.setCapacity(request.capacity());
         walk.setPriceCents(request.priceCents());
         walk.setNonMemberPriceCents(request.nonMemberPriceCents());
         walk.setWalkerId(request.walkerId());
-        if ("COMMUNITY".equals(request.walkType())) {
-            walk.setOrganizerUserId(principal.getId());
-        }
+        // Créateur = compte qui publie (sert à la note moyenne organisateur).
+        walk.setOrganizerUserId(principal.getId());
         walk.setAcceptedSizes(request.acceptedSizes().toArray(String[]::new));
         walk.setAcceptedEnergy(request.acceptedEnergy().toArray(String[]::new));
         walk.setMinSociabilityDogs(request.minSociabilityDogs());
@@ -142,8 +182,285 @@ public class WalkService {
         }
         walk.setAllowsDangerCategories(request.allowsDangerCategories());
         walk.setRouteHint(request.routeHint());
+        walk.setRouteGeojson(normalizeRouteGeojson(request.routeGeojson()));
         walk.setStatus("PUBLISHED");
+        Walk saved = walkRepository.save(walk);
+        messagingService.ensureWalkThread(saved);
+        return toResponse(saved);
+    }
+
+    // Modification réservée au créateur (organisateur) ou admin.
+    @Transactional
+    public WalkResponse update(Long walkId, WalkUpdateRequest request) {
+        Walk walk = walkRepository.findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (walk.getArchivedAt() != null
+                || "CANCELLED".equals(walk.getStatus())
+                || "COMPLETED".equals(walk.getStatus())
+                || "IN_PROGRESS".equals(walk.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Walk cannot be edited in status " + walk.getStatus());
+        }
+
+        requireCreatorOrAdmin(walk);
+
+        if (!meetingPointRepository.existsById(request.meetingPointId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting point not found");
+        }
+        MeetingPoint meetingPoint = meetingPointRepository.findById(request.meetingPointId()).orElseThrow();
+        if (!meetingPoint.getCityId().equals(walk.getCityId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting point must belong to the walk city");
+        }
+
+        assertCapacityAllowed(walk.getWalkType(), request.capacity());
+        long booked = bookingRepository.countByWalkIdAndStatusIn(
+                walk.getId(), List.of("CONFIRMED", "PENDING_PAYMENT"));
+        if (request.capacity() < booked) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Capacity cannot be below current bookings (" + booked + ")");
+        }
+
+        walk.setMeetingPointId(request.meetingPointId());
+        walk.setTitle(request.title());
+        walk.setDescription(request.description());
+        walk.setStartsAt(request.startsAt());
+        walk.setDurationMinutes(request.durationMinutes());
+        applyDifficultyInputs(walk, request.durationMinutes(), request.elevationGainM(), request.terrainType());
+        walk.setCapacity(request.capacity());
+        walk.setAcceptedSizes(request.acceptedSizes().toArray(String[]::new));
+        walk.setAcceptedEnergy(request.acceptedEnergy().toArray(String[]::new));
+        walk.setMinSociabilityDogs(request.minSociabilityDogs());
+        walk.setRouteHint(request.routeHint());
+        walk.setRouteGeojson(normalizeRouteGeojson(request.routeGeojson()));
+        walk.setUpdatedAt(Instant.now());
         return toResponse(walkRepository.save(walk));
+    }
+
+    private void applyDifficultyInputs(Walk walk, int durationMinutes, Integer elevationGainM, String terrainType) {
+        int elevation = difficultyCalculator.normalizeElevation(elevationGainM);
+        String terrain = difficultyCalculator.normalizeTerrain(terrainType);
+        walk.setElevationGainM(elevation);
+        walk.setTerrainType(terrain);
+        walk.setDifficultyLevel(difficultyCalculator.compute(durationMinutes, elevation, terrain));
+    }
+
+    // Démarre la balade (organisateur / encadrant / admin) → suivi GPS côté app.
+    @Transactional
+    public WalkResponse start(Long walkId) {
+        Walk walk = walkRepository.findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requireStaffForWalk(walk, SecurityUtils.currentUserId());
+
+        String status = walk.getStatus();
+        if ("IN_PROGRESS".equals(status)) {
+            return toResponse(walk);
+        }
+        if (!"PUBLISHED".equals(status)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Walk cannot be started in status " + status);
+        }
+
+        Instant now = Instant.now();
+        walk.setStatus("IN_PROGRESS");
+        walk.setStartedAt(now);
+        walk.setCompletedAt(null);
+        walk.setUpdatedAt(now);
+        return toResponse(walkRepository.save(walk));
+    }
+
+    // Termine la balade en cours.
+    @Transactional
+    public WalkResponse complete(Long walkId) {
+        Walk walk = walkRepository.findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requireStaffForWalk(walk, SecurityUtils.currentUserId());
+
+        String status = walk.getStatus();
+        if ("COMPLETED".equals(status)) {
+            return toResponse(walk);
+        }
+        if (!"IN_PROGRESS".equals(status) && !"PUBLISHED".equals(status)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Walk cannot be completed in status " + status);
+        }
+
+        Instant now = Instant.now();
+        walk.setStatus("COMPLETED");
+        if (walk.getStartedAt() == null) {
+            walk.setStartedAt(now);
+        }
+        walk.setCompletedAt(now);
+        walk.setArchivedAt(now);
+        walk.setUpdatedAt(now);
+        return toResponse(walkRepository.save(walk));
+    }
+
+    /**
+     * Archive une balade (soft). Retire du catalogue ; pas de suppression physique.
+     * Réservé au créateur / encadrant / admin.
+     */
+    @Transactional
+    public WalkResponse archive(Long walkId) {
+        Walk walk = walkRepository.findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requireStaffForWalk(walk, SecurityUtils.currentUserId());
+
+        Instant now = Instant.now();
+        if (walk.getArchivedAt() != null) {
+            return toResponse(walk);
+        }
+        String status = walk.getStatus();
+        if ("PUBLISHED".equals(status) || "IN_PROGRESS".equals(status) || "DRAFT".equals(status)) {
+            walk.setStatus("CANCELLED");
+            walk.setCancelledByUserId(SecurityUtils.currentUserId());
+            walk.setCancellationReason("archived");
+        }
+        walk.setArchivedAt(now);
+        walk.setUpdatedAt(now);
+        return toResponse(walkRepository.save(walk));
+    }
+
+    /**
+     * Suppression définitive : admin uniquement. Impossible s'il reste des réservations
+     * (FK ON DELETE RESTRICT) — dans ce cas, archiver.
+     */
+    @Transactional
+    public void deleteByAdmin(Long walkId) {
+        if (!SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can delete walks");
+        }
+        Walk walk = walkRepository.findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!bookingRepository.findByWalkId(walkId).isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Walk has bookings and cannot be deleted; archive it instead");
+        }
+        waitlistEntryRepository.deleteByWalkId(walkId);
+        walkRatingRepository.deleteByWalkId(walkId);
+        walkRepository.delete(walk);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WalkResponse> archived() {
+        if (!SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return walkRepository.findArchived().stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * Recycle une balade passée : copie les attributs vers une nouvelle édition à {@code startsAt}.
+     * Photos et notes restent sur la lignée source (lues via {@link #history}).
+     */
+    @Transactional
+    public WalkResponse recycle(Long sourceWalkId, WalkRecycleRequest request) {
+        Walk source = walkRepository
+                .findById(sourceWalkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requireCreatorOrAdmin(source);
+
+        boolean past = source.getArchivedAt() != null
+                || "COMPLETED".equals(source.getStatus())
+                || "CANCELLED".equals(source.getStatus());
+        if (!past) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Only archived/completed/cancelled walks can be recycled");
+        }
+        if (request.startsAt() == null || !request.startsAt().isAfter(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startsAt must be in the future");
+        }
+
+        Long callerId = SecurityUtils.currentUserId();
+        Walk walk = new Walk();
+        walk.setCityId(source.getCityId());
+        walk.setMeetingPointId(source.getMeetingPointId());
+        walk.setWalkType(source.getWalkType());
+        walk.setTitle(source.getTitle());
+        walk.setDescription(source.getDescription());
+        walk.setStartsAt(request.startsAt());
+        walk.setDurationMinutes(source.getDurationMinutes());
+        walk.setElevationGainM(source.getElevationGainM());
+        walk.setTerrainType(source.getTerrainType());
+        walk.setDifficultyLevel(source.getDifficultyLevel());
+        walk.setCapacity(source.getCapacity());
+        walk.setPriceCents(source.getPriceCents());
+        walk.setNonMemberPriceCents(source.getNonMemberPriceCents());
+        walk.setWalkerId(source.getWalkerId());
+        walk.setOrganizerUserId(callerId);
+        walk.setAcceptedSizes(
+                source.getAcceptedSizes() == null ? new String[] {"SMALL", "MEDIUM"} : source.getAcceptedSizes().clone());
+        walk.setAcceptedEnergy(
+                source.getAcceptedEnergy() == null
+                        ? new String[] {"LOW", "MEDIUM"}
+                        : source.getAcceptedEnergy().clone());
+        walk.setMinSociabilityDogs(source.getMinSociabilityDogs());
+        walk.setAllowsDangerCategories(source.isAllowsDangerCategories());
+        walk.setRouteHint(source.getRouteHint());
+        walk.setRouteGeojson(source.getRouteGeojson() == null ? null : new LinkedHashMap<>(source.getRouteGeojson()));
+        walk.setStatus("PUBLISHED");
+        walk.setRecycledFromWalkId(source.getId());
+        Walk saved = walkRepository.save(walk);
+        messagingService.ensureWalkThread(saved);
+        return toResponse(saved);
+    }
+
+    /** Photos + commentaires des notes ★ sur toute la lignée recycled_from. */
+    @Transactional(readOnly = true)
+    public WalkHistoryResponse history(Long walkId) {
+        Walk walk = walkRepository
+                .findById(walkId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        List<Long> lineage = lineageWalkIds(walk);
+        if (lineage.isEmpty()) {
+            return new WalkHistoryResponse(walkId, walk.getRecycledFromWalkId(), List.of(), List.of(), List.of());
+        }
+
+        Map<Long, Walk> byId = new LinkedHashMap<>();
+        for (Long id : lineage) {
+            walkRepository.findById(id).ifPresent(w -> byId.put(id, w));
+        }
+
+        List<WalkPhotoResponse> photos = walkPhotoService.listForWalks(lineage);
+        List<WalkHistoryComment> comments = new ArrayList<>();
+        for (WalkRating rating : walkRatingRepository.findByWalkIdInOrderByCreatedAtDesc(lineage)) {
+            if (rating.getComment() == null || rating.getComment().isBlank()) {
+                continue;
+            }
+            Walk src = byId.get(rating.getWalkId());
+            comments.add(new WalkHistoryComment(
+                    rating.getWalkId(),
+                    src != null ? src.getTitle() : null,
+                    src != null ? src.getStartsAt() : null,
+                    rating.getUserId(),
+                    privacyService.displayName(rating.getUserId()),
+                    rating.getRating(),
+                    rating.getComment(),
+                    rating.getCreatedAt()));
+        }
+        return new WalkHistoryResponse(walkId, walk.getRecycledFromWalkId(), lineage, photos, comments);
+    }
+
+    private List<Long> lineageWalkIds(Walk walk) {
+        LinkedHashSet<Long> ids = new LinkedHashSet<>();
+        Long cursor = walk.getRecycledFromWalkId();
+        int guard = 0;
+        while (cursor != null && guard++ < 20) {
+            if (!ids.add(cursor)) {
+                break;
+            }
+            cursor = walkRepository.findById(cursor).map(Walk::getRecycledFromWalkId).orElse(null);
+        }
+        return List.copyOf(ids);
+    }
+
+    private void requireCreatorOrAdmin(Walk walk) {
+        var principal = SecurityUtils.currentUser();
+        boolean admin = principal.getRoles().contains(Role.ADMIN);
+        boolean organizer = walk.getOrganizerUserId() != null
+                && walk.getOrganizerUserId().equals(principal.getId());
+        if (!admin && !organizer) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the walk creator can edit this walk");
+        }
     }
 
     // Liste des inscrits : réservée à l'encadrant / organisateur / admin (téléphone conditionnel).
@@ -186,6 +503,49 @@ public class WalkService {
         }
     }
 
+    // Valide un GeoJSON LineString optionnel (2–50 points [lng, lat]).
+    Map<String, Object> normalizeRouteGeojson(Map<String, Object> root) {
+        if (root == null || root.isEmpty()) {
+            return null;
+        }
+        if (!"LineString".equals(String.valueOf(root.get("type")))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "routeGeojson must be a LineString");
+        }
+        Object coordsRaw = root.get("coordinates");
+        if (!(coordsRaw instanceof List<?> coordsNode)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "routeGeojson coordinates required");
+        }
+        int size = coordsNode.size();
+        if (size < ROUTE_MIN_POINTS || size > ROUTE_MAX_POINTS) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "routeGeojson must have between " + ROUTE_MIN_POINTS + " and " + ROUTE_MAX_POINTS + " points");
+        }
+        List<List<Double>> cleaned = new ArrayList<>(size);
+        for (Object pointObj : coordsNode) {
+            if (!(pointObj instanceof List<?> point) || point.size() < 2) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid routeGeojson coordinate");
+            }
+            double lng = toDouble(point.get(0));
+            double lat = toDouble(point.get(1));
+            if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "routeGeojson coordinate out of bounds");
+            }
+            cleaned.add(List.of(lng, lat));
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("type", "LineString");
+        out.put("coordinates", cleaned);
+        return out;
+    }
+
+    private static double toDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid routeGeojson coordinate");
+    }
+
     private void requireStaffForWalk(Walk walk, Long viewerId) {
         var principal = SecurityUtils.currentUser();
         if (principal.getRoles().contains(Role.ADMIN)) {
@@ -224,18 +584,43 @@ public class WalkService {
                 walk.getDescription(),
                 walk.getStartsAt(),
                 walk.getDurationMinutes(),
+                walk.getElevationGainM(),
+                walk.getTerrainType(),
+                walk.getDifficultyLevel(),
                 walk.getCapacity(),
                 (int) booked,
                 walk.getPriceCents(),
                 walk.getNonMemberPriceCents(),
                 walk.getWalkerId(),
                 walk.getOrganizerUserId(),
+                organizerDisplayName(walk),
                 walk.getStatus(),
+                walk.getStartedAt(),
+                walk.getCompletedAt(),
+                walk.getArchivedAt(),
+                walk.getRecycledFromWalkId(),
+                walk.getId() == null ? List.of() : walkPhotoService.promoUrls(walk.getId(), 3),
+                walk.getId() == null ? 0 : (int) walkPhotoService.galleryCount(walk.getId()),
                 walk.getAcceptedSizes() == null ? List.of() : List.of(walk.getAcceptedSizes()),
                 walk.getAcceptedEnergy() == null ? List.of() : List.of(walk.getAcceptedEnergy()),
                 walk.getMinSociabilityDogs(),
                 walk.isAllowsDangerCategories(),
                 walk.getRouteHint(),
+                walk.getRouteGeojson(),
                 walk.isCommunityDisclaimerRequired());
+    }
+
+    private String organizerDisplayName(Walk walk) {
+        if (walk.getOrganizerUserId() != null) {
+            return privacyService.displayName(walk.getOrganizerUserId());
+        }
+        if (walk.getWalkerId() != null) {
+            return walkerProfileRepository
+                    .findById(walk.getWalkerId())
+                    .map(WalkerProfile::getUserId)
+                    .map(privacyService::displayName)
+                    .orElse(null);
+        }
+        return null;
     }
 }

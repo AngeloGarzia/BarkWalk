@@ -21,4 +21,13 @@ public final class SecurityUtils {
     public static Long currentUserId() {
         return currentUser().getId();
     }
+
+    /** Null si anonyme / non authentifié. */
+    public static Long currentUserIdOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof BarkWalkUserPrincipal principal)) {
+            return null;
+        }
+        return principal.getId();
+    }
 }

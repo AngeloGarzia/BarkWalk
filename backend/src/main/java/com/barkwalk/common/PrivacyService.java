@@ -50,6 +50,9 @@ public class PrivacyService {
         if (profile == null) {
             return ANONYMIZED_DISPLAY_NAME;
         }
+        if (profile.getPseudo() != null && !profile.getPseudo().isBlank()) {
+            return profile.getPseudo().trim();
+        }
         String first = profile.getFirstName() == null ? "" : profile.getFirstName().trim();
         String last = profile.getLastName() == null ? "" : profile.getLastName().trim();
         String name = (first + " " + last).trim();

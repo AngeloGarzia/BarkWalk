@@ -19,6 +19,7 @@ import com.barkwalk.storage.StorageTx;
 import com.barkwalk.storage.StoredImage;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class DogService {
     private static final int MAX_PHOTOS = 3;
+
+    /** Champs identité / sécurité / matching balades : modification → revalidation admin. */
+    private static final String SENSITIVE_EDIT_AUDIT = "DOG_SENSITIVE_EDIT";
 
     private final DogRepository dogRepository;
     private final DogDocumentRepository documentRepository;
@@ -71,9 +75,21 @@ public class DogService {
     @Transactional
     public DogResponse update(Long id, DogRequest request) {
         Dog dog = owned(id);
+        boolean wasValidated = "VALIDATED".equals(dog.getDossierStatus());
+        boolean sensitiveChanged = sensitiveFieldsChanged(dog, request);
         apply(dog, request);
         dog.setUpdatedAt(Instant.now());
-        if (!"VALIDATED".equals(dog.getDossierStatus())) {
+        if (wasValidated && sensitiveChanged) {
+            // Profil déjà validé : champs sensibles → repasse en file d’attente admin.
+            dog.setDossierStatus("PENDING");
+            dog.setRefusalReason(null);
+            auditService.log(
+                    SecurityUtils.currentUserId(),
+                    SENSITIVE_EDIT_AUDIT,
+                    "DOG",
+                    id,
+                    "Modification sensible — revalidation requise");
+        } else if (!wasValidated) {
             dog.setDossierStatus("DRAFT");
         }
         return toResponse(dog);
@@ -281,6 +297,33 @@ public class DogService {
         dog.setLeashPulling(request.leashPulling());
         dog.setAttentionNotes(request.attentionNotes());
         dog.setDangerCategory(request.dangerCategory());
+    }
+
+    /**
+     * Champs libres (sans revalidation) : name, weightKg, recallLevel, leashPulling, attentionNotes.
+     * Le reste du profil (identité, taille, énergie, sociabilité, danger, ID…) est sensible.
+     */
+    static boolean sensitiveFieldsChanged(Dog dog, DogRequest request) {
+        return !Objects.equals(normalize(dog.getBreed()), normalize(request.breed()))
+                || !Objects.equals(dog.getBirthDate(), request.birthDate())
+                || !Objects.equals(normalize(dog.getSex()), normalize(request.sex()))
+                || dog.isSterilized() != request.sterilized()
+                || !Objects.equals(normalize(dog.getSizeCategory()), normalize(request.sizeCategory()))
+                || !Objects.equals(
+                        normalize(dog.getIdentificationNumber()), normalize(request.identificationNumber()))
+                || !Objects.equals(normalize(dog.getEnergyLevel()), normalize(request.energyLevel()))
+                || !Objects.equals(normalize(dog.getSociabilityDogs()), normalize(request.sociabilityDogs()))
+                || !Objects.equals(
+                        normalize(dog.getSociabilityHumans()), normalize(request.sociabilityHumans()))
+                || !Objects.equals(normalize(dog.getDangerCategory()), normalize(request.dangerCategory()));
+    }
+
+    private static String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private DogResponse toResponse(Dog dog) {

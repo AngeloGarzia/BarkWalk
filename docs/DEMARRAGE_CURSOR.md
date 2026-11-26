@@ -159,11 +159,16 @@ Mot de passe commun : **`Admin123!`** (avec le point d’exclamation)
 
 | E-mail | Rôle |
 |--------|------|
-| `admin@barkwalk.fr` | ADMIN |
-| `alice@example.com` | MEMBER (+ organisateur communautaire) |
+| `user@barkwalk.fr` | USER |
+| `member@barkwalk.fr` | MEMBER |
+| `org@barkwalk.fr` | COMMUNITY_ORG (+ MEMBER) |
 | `walker@barkwalk.fr` | WALKER_STAFF |
+| `indep@barkwalk.fr` | WALKER_INDEP |
+| `admin@barkwalk.fr` | ADMIN |
 
-Sur l’écran Connexion, des raccourcis peuvent préremplir ces comptes.
+Compte historique toujours disponible : `alice@example.com` (MEMBER + COMMUNITY_ORG).
+
+Sur l’écran Connexion, des raccourcis préremplissent ces comptes.
 
 ---
 
