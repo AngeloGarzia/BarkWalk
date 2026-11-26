@@ -53,5 +53,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Test (headless)
-        run: npm test
+      # À réactiver quand des tests front existent
+      # - name: Test (headless)
+      #   run: npm test
