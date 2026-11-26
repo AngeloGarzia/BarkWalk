@@ -1,6 +1,8 @@
 package com.barkwalk.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.barkwalk.support.PostgresTestcontainers;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -52,5 +55,35 @@ class RoleAccessIT {
     @WithMockUser(roles = "ADMIN")
     void adminDashboard_okForAdmin() throws Exception {
         mockMvc.perform(get("/api/admin/dashboard")).andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void adminSettings_forbiddenForUser() throws Exception {
+        mockMvc.perform(get("/api/admin/settings")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void adminSettingsUpdate_forbiddenForUser() throws Exception {
+        mockMvc.perform(put("/api/admin/settings/cancellation_free_hours")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"48\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminSettings_readableAndUpdatableForAdmin() throws Exception {
+        mockMvc.perform(get("/api/admin/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.key=='cancellation_free_hours')]").exists());
+
+        mockMvc.perform(put("/api/admin/settings/cancellation_free_hours")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"48\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.key").value("cancellation_free_hours"))
+                .andExpect(jsonPath("$.value").value("48"));
     }
 }

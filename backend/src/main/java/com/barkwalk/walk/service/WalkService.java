@@ -1,7 +1,6 @@
 package com.barkwalk.walk.service;
 
-import com.barkwalk.admin.domain.Setting;
-import com.barkwalk.admin.repository.SettingRepository;
+import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
@@ -31,7 +30,7 @@ public class WalkService {
     private final CityRepository cityRepository;
     private final BookingRepository bookingRepository;
     private final ProfileRepository profileRepository;
-    private final SettingRepository settingRepository;
+    private final BusinessSettingsService businessSettingsService;
 
     public WalkService(
             WalkRepository walkRepository,
@@ -39,13 +38,13 @@ public class WalkService {
             CityRepository cityRepository,
             BookingRepository bookingRepository,
             ProfileRepository profileRepository,
-            SettingRepository settingRepository) {
+            BusinessSettingsService businessSettingsService) {
         this.walkRepository = walkRepository;
         this.meetingPointRepository = meetingPointRepository;
         this.cityRepository = cityRepository;
         this.bookingRepository = bookingRepository;
         this.profileRepository = profileRepository;
-        this.settingRepository = settingRepository;
+        this.businessSettingsService = businessSettingsService;
     }
 
     @Transactional(readOnly = true)
@@ -71,8 +70,7 @@ public class WalkService {
         if ("COMMUNITY".equals(request.walkType())) {
             Profile profile = profileRepository.findById(principal.getId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST));
-            int threshold = Integer.parseInt(settingRepository.findById("community_walks_threshold")
-                    .map(Setting::getValue).orElse("3"));
+            int threshold = businessSettingsService.communityWalksThreshold();
             boolean orgOk = "ACTIVE".equals(profile.getCommunityOrgStatus())
                     || ("ELIGIBLE".equals(profile.getCommunityOrgStatus())
                             && profile.getCompletedWalksCount() >= threshold);

@@ -1,6 +1,6 @@
 package com.barkwalk.review.service;
 
-import com.barkwalk.admin.repository.SettingRepository;
+import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.review.domain.Review;
@@ -21,17 +21,17 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final BookingRepository bookingRepository;
     private final WalkRepository walkRepository;
-    private final SettingRepository settingRepository;
+    private final BusinessSettingsService businessSettingsService;
 
     public ReviewService(
             ReviewRepository reviewRepository,
             BookingRepository bookingRepository,
             WalkRepository walkRepository,
-            SettingRepository settingRepository) {
+            BusinessSettingsService businessSettingsService) {
         this.reviewRepository = reviewRepository;
         this.bookingRepository = bookingRepository;
         this.walkRepository = walkRepository;
-        this.settingRepository = settingRepository;
+        this.businessSettingsService = businessSettingsService;
     }
 
     @Transactional
@@ -44,8 +44,7 @@ public class ReviewService {
         Walk walk = walkRepository
                 .findById(request.walkId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        int days = Integer.parseInt(
-                settingRepository.findById("review_window_days").map(s -> s.getValue()).orElse("14"));
+        int days = businessSettingsService.reviewWindowDays();
         if (walk.getStartsAt().plus(days, ChronoUnit.DAYS).isBefore(Instant.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Review window closed");
         }

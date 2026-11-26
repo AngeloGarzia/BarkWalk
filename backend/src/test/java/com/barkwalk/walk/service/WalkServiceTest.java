@@ -6,8 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.barkwalk.admin.domain.Setting;
-import com.barkwalk.admin.repository.SettingRepository;
+import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.city.domain.City;
 import com.barkwalk.city.repository.CityRepository;
@@ -46,7 +45,7 @@ class WalkServiceTest {
     @Mock
     private ProfileRepository profileRepository;
     @Mock
-    private SettingRepository settingRepository;
+    private BusinessSettingsService businessSettingsService;
 
     @InjectMocks
     private WalkService walkService;
@@ -108,10 +107,7 @@ class WalkServiceTest {
         profile.setCommunityOrgStatus("NONE");
         profile.setCompletedWalksCount(0);
         when(profileRepository.findById(4L)).thenReturn(Optional.of(profile));
-        Setting setting = new Setting();
-        setting.setKey("community_walks_threshold");
-        setting.setValue("3");
-        when(settingRepository.findById("community_walks_threshold")).thenReturn(Optional.of(setting));
+        when(businessSettingsService.communityWalksThreshold()).thenReturn(3);
 
         assertThatThrownBy(() -> walkService.create(createRequest("COMMUNITY")))
                 .isInstanceOf(ResponseStatusException.class)
@@ -126,9 +122,7 @@ class WalkServiceTest {
         profile.setCommunityOrgStatus("ACTIVE");
         profile.setCompletedWalksCount(10);
         when(profileRepository.findById(5L)).thenReturn(Optional.of(profile));
-        Setting setting = new Setting();
-        setting.setValue("3");
-        when(settingRepository.findById("community_walks_threshold")).thenReturn(Optional.of(setting));
+        when(businessSettingsService.communityWalksThreshold()).thenReturn(3);
         when(meetingPointRepository.existsById(3L)).thenReturn(true);
         when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> {
             Walk w = inv.getArgument(0);
