@@ -15,8 +15,7 @@ import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
-import com.barkwalk.user.domain.Profile;
-import com.barkwalk.user.repository.ProfileRepository;
+import com.barkwalk.user.service.CommunityOrgService;
 import java.time.Instant;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,19 +28,19 @@ public class AttendanceService {
     private final BookingRepository bookingRepository;
     private final WalkReportRepository walkReportRepository;
     private final WalkReportDogNoteRepository noteRepository;
-    private final ProfileRepository profileRepository;
+    private final CommunityOrgService communityOrgService;
 
     public AttendanceService(
             AttendanceRepository attendanceRepository,
             BookingRepository bookingRepository,
             WalkReportRepository walkReportRepository,
             WalkReportDogNoteRepository noteRepository,
-            ProfileRepository profileRepository) {
+            CommunityOrgService communityOrgService) {
         this.attendanceRepository = attendanceRepository;
         this.bookingRepository = bookingRepository;
         this.walkReportRepository = walkReportRepository;
         this.noteRepository = noteRepository;
-        this.profileRepository = profileRepository;
+        this.communityOrgService = communityOrgService;
     }
 
     @Transactional
@@ -56,15 +55,8 @@ public class AttendanceService {
         Attendance attendance = point(request, false);
         Booking booking = bookingRepository.findById(request.bookingId()).orElseThrow();
         if ("PRESENT".equalsIgnoreCase(request.status())) {
-            Profile profile = profileRepository.findById(booking.getUserId()).orElse(null);
-            if (profile != null) {
-                profile.setCompletedWalksCount(profile.getCompletedWalksCount() + 1);
-                if (profile.getCompletedWalksCount() >= 3
-                        && !profile.isCommunityOrgRevoked()
-                        && !"ACTIVE".equals(profile.getCommunityOrgStatus())) {
-                    profile.setCommunityOrgStatus("ELIGIBLE");
-                }
-            }
+            // R8 : balade terminée → compteur + éligibilité org via settings.
+            communityOrgService.onWalkCompleted(booking.getUserId());
             booking.setStatus("COMPLETED");
         }
         return toAttendance(attendance);

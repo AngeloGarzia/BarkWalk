@@ -15,4 +15,6 @@ import jakarta.persistence.LockModeType;
 
 public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByStatusOrderByCreatedAtDesc(String status);
+
+    long countByTargetTypeAndTargetIdAndDecision(String targetType, Long targetId, String decision);
 }

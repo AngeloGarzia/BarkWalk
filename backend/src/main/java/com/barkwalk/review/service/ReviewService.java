@@ -8,6 +8,7 @@ import com.barkwalk.review.domain.Review;
 import com.barkwalk.review.dto.ReviewDtos.ReviewRequest;
 import com.barkwalk.review.dto.ReviewDtos.ReviewResponse;
 import com.barkwalk.review.repository.ReviewRepository;
+import com.barkwalk.user.service.CommunityOrgService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import java.time.Instant;
@@ -24,18 +25,21 @@ public class ReviewService {
     private final WalkRepository walkRepository;
     private final BusinessSettingsService businessSettingsService;
     private final PrivacyService privacyService;
+    private final CommunityOrgService communityOrgService;
 
     public ReviewService(
             ReviewRepository reviewRepository,
             BookingRepository bookingRepository,
             WalkRepository walkRepository,
             BusinessSettingsService businessSettingsService,
-            PrivacyService privacyService) {
+            PrivacyService privacyService,
+            CommunityOrgService communityOrgService) {
         this.reviewRepository = reviewRepository;
         this.bookingRepository = bookingRepository;
         this.walkRepository = walkRepository;
         this.businessSettingsService = businessSettingsService;
         this.privacyService = privacyService;
+        this.communityOrgService = communityOrgService;
     }
 
     @Transactional
@@ -66,7 +70,9 @@ public class ReviewService {
         review.setTargetUserId(request.targetUserId());
         review.setRating(request.rating());
         review.setComment(request.comment());
-        return toResponse(reviewRepository.save(review));
+        Review saved = reviewRepository.save(review);
+        communityOrgService.evaluateRevocation(request.targetUserId());
+        return toResponse(saved);
     }
 
     private ReviewResponse toResponse(Review r) {

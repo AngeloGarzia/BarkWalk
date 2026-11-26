@@ -15,4 +15,6 @@ import jakarta.persistence.LockModeType;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
     boolean existsByWalkIdAndAuthorIdAndTargetUserId(Long walkId, Long authorId, Long targetUserId);
+
+    List<Review> findByTargetUserId(Long targetUserId);
 }
