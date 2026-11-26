@@ -267,15 +267,16 @@ export class AdminSettingsComponent implements OnInit {
     this.load();
   }
 
-  protected onDraft(key: string, value: string): void {
+  protected onDraft(key: string, value: string | number | null): void {
+    const draft = value === null || value === undefined ? '' : String(value);
     this.rows.update((list) =>
-      list.map((r) => (r.key === key ? { ...r, draft: value, savedAt: null, error: null } : r)),
+      list.map((r) => (r.key === key ? { ...r, draft, savedAt: null, error: null } : r)),
     );
   }
 
   protected save(row: EditableSetting): void {
     this.patchRow(row.key, { saving: true, error: null });
-    this.http.put<SettingRow>(`/api/admin/settings/${row.key}`, { value: row.draft }).subscribe({
+    this.http.put<SettingRow>(`/api/admin/settings/${row.key}`, { value: String(row.draft) }).subscribe({
       next: (updated) => {
         this.patchRow(row.key, {
           value: updated.value,
