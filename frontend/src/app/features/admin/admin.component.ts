@@ -1,6 +1,7 @@
 // Tableau de bord administration.
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 
 interface DashboardStats {
   users: number;
@@ -22,12 +23,17 @@ interface PendingDog {
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   template: `
     <div class="admin-page">
       <header class="page-header">
-        <h1>Administration</h1>
-        <p class="subtitle">Tableau de bord et validation des chiens.</p>
+        <div class="header-row">
+          <div>
+            <h1>Administration</h1>
+            <p class="subtitle">Tableau de bord et validation des chiens.</p>
+          </div>
+          <a routerLink="/admin/settings" class="btn-ghost">Paramètres</a>
+        </div>
       </header>
 
       @if (error()) {
@@ -95,6 +101,13 @@ interface PendingDog {
       }
       .page-header {
         margin-bottom: 1.5rem;
+      }
+      .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
       }
       h1 {
         font-family: var(--font-display);

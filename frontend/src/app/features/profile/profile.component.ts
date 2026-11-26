@@ -2,7 +2,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/auth.service';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   PhotoItem,
   PhotoUploaderComponent,
@@ -25,7 +25,7 @@ interface UserProfile {
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [PhotoUploaderComponent],
+  imports: [PhotoUploaderComponent, RouterLink],
   template: `
     <div class="profile-page">
       <header class="page-header">
@@ -52,6 +52,10 @@ interface UserProfile {
             <p class="muted">Balades terminées : {{ p.completedWalksCount }}</p>
           </div>
         </div>
+
+        @if (isAdmin()) {
+          <a routerLink="/admin" class="admin-link">Administration</a>
+        }
 
         <section class="panel">
           <app-photo-uploader
@@ -139,6 +143,24 @@ interface UserProfile {
       .muted {
         color: var(--muted);
       }
+      .admin-link {
+        display: block;
+        text-align: center;
+        text-decoration: none;
+        margin-bottom: 0.85rem;
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--forest-deep);
+        font-weight: 700;
+        font-family: var(--font-display);
+        box-shadow: var(--shadow-sm);
+      }
+      .admin-link:hover {
+        border-color: var(--forest);
+        color: var(--forest);
+      }
       .logout {
         margin-top: 1.25rem;
         width: 100%;
@@ -168,6 +190,9 @@ export class ProfileComponent implements OnInit {
   protected readonly profile = signal<UserProfile | null>(null);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected isAdmin(): boolean {
+    return this.auth.isAdmin();
+  }
 
   protected readonly initials = () => {
     const p = this.profile();

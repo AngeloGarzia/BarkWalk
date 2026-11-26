@@ -1,15 +1,58 @@
-// Ajoute le Bearer JWT aux appels API et gère le refresh basique.
-import { HttpInterceptorFn } from '@angular/common/http';
+// Ajoute le Bearer JWT aux appels API et rafraîchit la session sur 401 / JWT expiré.
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
+
+function isJwtExpired(token: string | null): boolean {
+  if (!token) {
+    return true;
+  }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]!)) as { exp?: number };
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
-  const token = authService.getToken();
+  const router = inject(Router);
   // JWT uniquement pour notre API — pas pour les appels externes (ex. dogapi.dog).
   const isAppApi = req.url.startsWith('/api') || req.url.startsWith('/actuator');
-  if (token && isAppApi) {
-    return next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
-  }
-  return next(req);
+  const isAuthEndpoint = req.url.startsWith('/api/auth/');
+
+  const withBearer = () => {
+    const token = authService.getToken();
+    if (token && isAppApi && !isAuthEndpoint) {
+      return req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+    }
+    return req;
+  };
+
+  return next(withBearer()).pipe(
+    catchError((err: HttpErrorResponse) => {
+      const expired = isJwtExpired(authService.getToken());
+      const canRefresh =
+        isAppApi &&
+        !isAuthEndpoint &&
+        !!authService.getRefreshToken() &&
+        (err.status === 401 || (err.status === 403 && expired));
+
+      if (!canRefresh) {
+        return throwError(() => err);
+      }
+
+      return authService.refreshSession().pipe(
+        switchMap(() => next(withBearer())),
+        catchError((refreshErr) => {
+          authService.logout();
+          void router.navigate(['/login']);
+          return throwError(() => refreshErr);
+        }),
+      );
+    }),
+  );
 };
