@@ -16,6 +16,9 @@
 | V4 | Règles métier R1–R16 (modèle) |
 | V5 | Comptes, RGPD, UUID publics |
 | V6 | Accès, paiements immuables, audit append-only, rôles DB |
+| V7 | Tables `profile_photos` / `dog_photos` (1–3 slots) |
+| V8–V11 | Settings restants, INDEP_GUIDED, etc. (voir migrations) |
+| V12 | UNIQUE différé `(user_id, sort_order)` / `(dog_id, sort_order)` + anonymize purge photos |
 
 ## Matrice R1 → R16
 
@@ -51,7 +54,7 @@
 - [x] Pas de secret / MDP rôle dans Git
 - [x] Identifiants publics UUID (users, dogs, walks, bookings, …)
 - [ ] Rate-limit / verrouillage login : colonnes prêtes, filtre app à renforcer
-- [ ] Liens signés S3 : déjà config app, pas de regression schéma
+- [x] Liens médias signés HMAC (`/api/media/...?exp=&sig=`) ; S3/MinIO à brancher avant prod
 - [ ] Confirmation paiement uniquement via webhook : à verrouiller côté service (confirmPayment browser encore présent)
 
 ## Risques / points ouverts

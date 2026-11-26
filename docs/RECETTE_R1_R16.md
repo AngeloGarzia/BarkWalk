@@ -32,7 +32,7 @@ Date : 2026-11-26 — étapes 1–13 implémentées côté serveur.
 | Rappels J-30/J-7 docs | `DocumentReminderService` + Brevo |
 | Rappel veille de balade | `WalkTomorrowReminderService` |
 | Concurrence dernière place | Lock pessimiste présent ; pas de test multi-thread dédié |
-| Photos profil/chien | WIP local non inclus dans les commits métier |
+| Photos profil/chien | Fait : 1–3 photos, URLs signées HMAC, magic bytes, V12 unicité différée |
 
 ## Commande de vérification
 

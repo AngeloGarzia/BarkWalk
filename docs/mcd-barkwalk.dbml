@@ -112,13 +112,35 @@ Table profiles {
   last_name varchar(80) [not null]
   phone varchar(30)
   bio varchar(500)
-  photo_key varchar(255)
+  photo_key varchar(255) [note: 'legacy: clé de la 1re photo']
   city_id bigint [ref: > cities.id]
   zone_id bigint [ref: > zones.id]
   community_org_status varchar(30) [not null, default: 'NONE', note: 'NONE|ELIGIBLE|ACTIVE|REVOKED']
   completed_walks_count int [not null, default: 0]
   created_at timestamptz [not null]
   updated_at timestamptz [not null]
+}
+
+Table profile_photos {
+  id bigint [pk, increment]
+  user_id bigint [not null, ref: > users.id]
+  storage_key varchar(255) [not null, note: 'longueur >= 8']
+  content_type varchar(80) [not null, default: 'image/jpeg']
+  sort_order smallint [not null, default: 0, note: '0..2']
+  created_at timestamptz [not null]
+
+  Note: 'UNIQUE (user_id, sort_order) DEFERRABLE INITIALLY DEFERRED (V12)'
+}
+
+Table dog_photos {
+  id bigint [pk, increment]
+  dog_id bigint [not null, ref: > dogs.id]
+  storage_key varchar(255) [not null, note: 'longueur >= 8']
+  content_type varchar(80) [not null, default: 'image/jpeg']
+  sort_order smallint [not null, default: 0, note: '0..2']
+  created_at timestamptz [not null]
+
+  Note: 'UNIQUE (dog_id, sort_order) DEFERRABLE INITIALLY DEFERRED (V12)'
 }
 
 Table community_org_status_history {

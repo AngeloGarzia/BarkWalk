@@ -78,3 +78,9 @@ cd frontend && npm start
 
 Recherche publique par **nom** ou **code postal** (`GET /api/cities?q=69001` ou `q=Lyon`).  
 Seed : Lyon (plusieurs CP), Paris, Marseille, Toulouse, Bordeaux, Nantes, etc.
+
+## Avant déploiement
+
+- Migrer le stockage photos/docs du disque local (`barkwalk.storage.local-path`) vers **S3/MinIO** (SDK AWS déjà en dépendance) ; les URLs `/api/media` signées HMAC restent le contrat client.
+- Renseigner un vrai secret `STORAGE_SIGNING_SECRET` (voir `.env.example`) — la valeur de `application.yml` n’est que pour le local.
+- Passer les rôles DB `barkwalk_app` / `_migrator` / `_readonly` en `LOGIN` avec mots de passe hors dépôt (`ALTER ROLE … LOGIN PASSWORD`), puis pointer le datasource app dessus.
