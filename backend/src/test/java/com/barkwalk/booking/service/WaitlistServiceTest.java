@@ -136,6 +136,74 @@ class WaitlistServiceTest {
     }
 
     @Test
+    void offerNext_noopWhenFullOrAlreadyOffered() {
+        Walk walk = new Walk();
+        setId(walk, 10L);
+        walk.setCapacity(1);
+        when(bookingRepository.countByWalkIdAndStatusIn(eq(10L), any())).thenReturn(1L);
+        when(walkRepository.findById(10L)).thenReturn(Optional.of(walk));
+        when(waitlistEntryRepository.findByWalkIdAndStatusOrderByPositionAsc(10L, "OFFERED"))
+                .thenReturn(List.of());
+        waitlistService.offerNext(10L);
+
+        when(bookingRepository.countByWalkIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+        WaitlistEntry offered = new WaitlistEntry();
+        offered.setStatus("OFFERED");
+        when(waitlistEntryRepository.findByWalkIdAndStatusOrderByPositionAsc(10L, "OFFERED"))
+                .thenReturn(List.of(offered));
+        waitlistService.offerNext(10L);
+    }
+
+    @Test
+    void offerNext_expiresStaleOfferBeforeSelectingNext() {
+        Walk walk = new Walk();
+        setId(walk, 10L);
+        walk.setCapacity(2);
+        when(bookingRepository.countByWalkIdAndStatusIn(eq(10L), any())).thenReturn(0L);
+        when(walkRepository.findById(10L)).thenReturn(Optional.of(walk));
+
+        WaitlistEntry stale = new WaitlistEntry();
+        setId(stale, 1L);
+        stale.setWalkId(10L);
+        stale.setStatus("OFFERED");
+        stale.setOfferExpiresAt(Instant.now().minusSeconds(30));
+        when(waitlistEntryRepository.findByWalkIdAndStatusOrderByPositionAsc(10L, "OFFERED"))
+                .thenReturn(List.of(stale))
+                .thenReturn(List.of());
+
+        WaitlistEntry waiting = new WaitlistEntry();
+        setId(waiting, 2L);
+        waiting.setWalkId(10L);
+        waiting.setUserId(8L);
+        waiting.setDogId(9L);
+        waiting.setStatus("WAITING");
+        waiting.setPosition(1);
+        when(waitlistEntryRepository.findByWalkIdAndStatusOrderByPositionAsc(10L, "WAITING"))
+                .thenReturn(List.of(waiting));
+        when(businessSettingsService.waitlistOfferHours()).thenReturn(2);
+        when(waitlistEntryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        waitlistService.offerNext(10L);
+
+        assertThat(stale.getStatus()).isEqualTo("EXPIRED");
+        assertThat(waiting.getStatus()).isEqualTo("OFFERED");
+    }
+
+    @Test
+    void acceptOffer_forbiddenForOtherUser() {
+        SecurityTestSupport.authenticate(99L, "other@example.com", Role.USER);
+        WaitlistEntry entry = new WaitlistEntry();
+        setId(entry, 5L);
+        entry.setUserId(3L);
+        entry.setStatus("OFFERED");
+        when(waitlistEntryRepository.findById(5L)).thenReturn(Optional.of(entry));
+        assertThatThrownBy(() -> waitlistService.acceptOffer(5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void acceptOffer_rejectsExpired() {
         SecurityTestSupport.authenticate(3L, "u@example.com", Role.USER);
         WaitlistEntry entry = new WaitlistEntry();

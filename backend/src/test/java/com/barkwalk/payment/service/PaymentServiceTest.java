@@ -143,4 +143,70 @@ class PaymentServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().amountCents()).isEqualTo(1000);
     }
+
+    @Test
+    void webhook_activatesMembershipAndRecordsPayment() {
+        when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_m")).thenReturn(false);
+        when(webhookEventRepository.save(any(WebhookEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        com.barkwalk.membership.domain.Membership membership = new com.barkwalk.membership.domain.Membership();
+        setId(membership, 5L);
+        membership.setUserId(9L);
+        when(membershipService.activateOnPayment(5L)).thenReturn(membership);
+        when(paymentRepository.findByMembershipId(5L)).thenReturn(Optional.empty());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> payload = Map.of(
+                "id",
+                "evt_m",
+                "data",
+                Map.of("object", Map.of("membership_id", "5", "id", "pi_m", "amount_cents", "4900")));
+        assertThat(service.handleWebhook("sig", payload).status()).isEqualTo("ok");
+
+        ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(captor.capture());
+        assertThat(captor.getValue().getPaymentType()).isEqualTo("MEMBERSHIP");
+        assertThat(captor.getValue().getAmountCents()).isEqualTo(4900);
+        assertThat(captor.getValue().getMembershipId()).isEqualTo(5L);
+    }
+
+    @Test
+    void webhook_skipsExistingBookingPayment() {
+        when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_3")).thenReturn(false);
+        when(webhookEventRepository.save(any(WebhookEvent.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingService.confirmPayment(42L))
+                .thenReturn(new BookingResponse(42L, 1L, 2L, "CONFIRMED", 2000, true, Instant.now()));
+        Booking booking = new Booking();
+        booking.setUserId(9L);
+        booking.setWalkId(1L);
+        booking.setPriceCents(2000);
+        when(bookingRepository.findById(42L)).thenReturn(Optional.of(booking));
+        when(paymentRepository.findByBookingId(42L)).thenReturn(Optional.of(new Payment()));
+
+        Map<String, Object> payload =
+                Map.of("id", "evt_3", "data", Map.of("object", Map.of("booking_id", "42", "id", "pi_1")));
+        assertThat(service.handleWebhook("sig", payload).status()).isEqualTo("ok");
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void allForAdmin_mapsPayments() {
+        Payment payment = new Payment();
+        payment.setAmountCents(500);
+        payment.setPaymentType("BOOKING");
+        payment.setStatus("SUCCEEDED");
+        when(paymentRepository.findAll()).thenReturn(List.of(payment));
+        assertThat(service.allForAdmin()).hasSize(1);
+        assertThat(service.allForAdmin().getFirst().amountCents()).isEqualTo(500);
+    }
+
+    private static void setId(Object entity, long id) {
+        try {
+            var f = entity.getClass().getDeclaredField("id");
+            f.setAccessible(true);
+            f.set(entity, id);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
 }
