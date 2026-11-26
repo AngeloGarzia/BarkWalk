@@ -21,6 +21,9 @@ import {
   Popup,
 } from 'maplibre-gl';
 import { AuthService } from '../../core/auth.service';
+import { CityPickerComponent } from '../../shared/city-picker/city-picker.component';
+import { City } from '../../shared/city.service';
+import { CitySelectionService } from '../../shared/city-selection.service';
 
 export interface WalkPin {
   id: number;
@@ -51,7 +54,7 @@ interface UserProfileLite {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, CityPickerComponent],
   template: `
     <div class="home">
       <header class="top-row">
@@ -173,10 +176,22 @@ interface UserProfileLite {
         }
       </section>
 
-      <section class="map-block" aria-label="Carte des balades en France">
+      <section class="map-block" aria-label="Carte des balades">
         <div class="map-head">
           <h2>Sur la carte</h2>
-          <p class="muted">Pins des balades publiées</p>
+          <p class="muted">
+            @if (selectedCity(); as city) {
+              Balades à {{ city.name }}
+            } @else {
+              Choisissez une ville pour zoomer
+            }
+          </p>
+        </div>
+        <div class="map-city">
+          <app-city-picker [initialCity]="selectedCity()" (citySelected)="onCity($event)" />
+          @if (selectedCity()) {
+            <button type="button" class="clear-city" (click)="clearCity()">Toute la France</button>
+          }
         </div>
         <div class="map-frame">
           <div #mapContainer class="map" role="presentation"></div>
@@ -428,8 +443,29 @@ interface UserProfileLite {
       }
 
       .map-head .muted {
-        margin: 0 0 0.65rem;
+        margin: 0 0 0.55rem;
         font-size: 0.85rem;
+      }
+
+      .map-city {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-bottom: 0.65rem;
+      }
+
+      .clear-city {
+        align-self: flex-start;
+        border: none;
+        background: transparent;
+        color: var(--forest);
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
 
       .map-frame {
@@ -517,6 +553,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  private readonly citySelection = inject(CitySelectionService);
 
   private map?: MapLibreMap;
   private markers: Marker[] = [];
@@ -534,12 +571,17 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly firstName = signal('là');
   protected readonly membershipLabel = signal('Invité · découverte');
   protected readonly cityHint = signal<string | null>(null);
+  protected readonly selectedCity = signal<City | null>(null);
 
   protected readonly filteredWalks = computed(() => {
     const q = this.query().trim().toLowerCase();
-    const list = [...this.walks()].sort(
+    const cityId = this.selectedCity()?.id;
+    let list = [...this.walks()].sort(
       (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
     );
+    if (cityId != null) {
+      list = list.filter((w) => w.cityId === cityId);
+    }
     if (!q) {
       return list;
     }
@@ -569,6 +611,11 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    const shared = this.citySelection.selectedCity();
+    if (shared) {
+      this.selectedCity.set(shared);
+      this.cityHint.set(shared.name);
+    }
     if (this.auth.loggedIn()) {
       this.http.get<UserProfileLite>('/api/me/profile').subscribe({
         next: (p) => {
@@ -634,6 +681,19 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   protected onQuery(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.query.set(value);
+  }
+
+  protected onCity(city: City): void {
+    this.selectedCity.set(city);
+    this.citySelection.setCity(city);
+    this.cityHint.set(city.name);
+    this.refreshMapForSelection();
+  }
+
+  protected clearCity(): void {
+    this.selectedCity.set(null);
+    this.citySelection.setCity(null);
+    this.refreshMapForSelection();
   }
 
   protected daysUntilLabel(startsAt: string): string {
@@ -721,17 +781,14 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     this.http.get<WalkPin[]>('/api/walks').subscribe({
       next: (walks) => {
         this.walks.set(walks);
-        const withCoords = walks.filter(
-          (w) => w.lat != null && w.lng != null && Number.isFinite(w.lat) && Number.isFinite(w.lng),
-        );
-        this.pendingWalks = withCoords;
-        this.pinCount.set(withCoords.length);
         this.loading.set(false);
-        const city = walks.find((w) => w.cityName)?.cityName;
-        if (city) {
-          this.cityHint.set(city);
+        if (!this.selectedCity()) {
+          const city = walks.find((w) => w.cityName)?.cityName;
+          if (city) {
+            this.cityHint.set(city);
+          }
         }
-        this.renderPendingMarkers();
+        this.refreshMapForSelection();
       },
       error: () => {
         this.loading.set(false);
@@ -740,14 +797,27 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private renderPendingMarkers(): void {
-    if (!this.mapReady || !this.pendingWalks) {
-      return;
-    }
-    this.placeMarkers(this.pendingWalks);
+  private refreshMapForSelection(): void {
+    const city = this.selectedCity();
+    const source = city
+      ? this.walks().filter((w) => w.cityId === city.id)
+      : this.walks();
+    const withCoords = source.filter(
+      (w) => w.lat != null && w.lng != null && Number.isFinite(w.lat) && Number.isFinite(w.lng),
+    );
+    this.pendingWalks = withCoords;
+    this.pinCount.set(withCoords.length);
+    this.renderPendingMarkers();
   }
 
-  private placeMarkers(walks: WalkPin[]): void {
+  private renderPendingMarkers(): void {
+    if (!this.mapReady || this.pendingWalks === null) {
+      return;
+    }
+    this.placeMarkers(this.pendingWalks, { cityFocus: this.selectedCity() != null });
+  }
+
+  private placeMarkers(walks: WalkPin[], options: { cityFocus?: boolean } = {}): void {
     const map = this.map;
     if (!map) {
       return;
@@ -764,7 +834,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
         this.highlightMarker(walk.id);
         this.map?.flyTo({
           center: [walk.lng!, walk.lat!],
-          zoom: Math.max(this.map.getZoom(), 9),
+          zoom: Math.max(this.map.getZoom(), 12),
           duration: 700,
         });
       });
@@ -782,14 +852,39 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
       this.markerEls.set(walk.id, el);
     }
 
+    const cityFocus = !!options.cityFocus;
     if (walks.length >= 2) {
       const bounds = new LngLatBounds();
       for (const walk of walks) {
         bounds.extend([walk.lng!, walk.lat!]);
       }
-      map.fitBounds(bounds, { padding: 36, maxZoom: 5.8, duration: 900 });
-    } else if (walks.length === 1) {
-      map.flyTo({ center: [walks[0].lng!, walks[0].lat!], zoom: 10, duration: 900 });
+      map.fitBounds(bounds, {
+        padding: cityFocus ? 48 : 36,
+        maxZoom: cityFocus ? 13 : 5.8,
+        duration: 900,
+      });
+      return;
+    }
+    if (walks.length === 1) {
+      map.flyTo({
+        center: [walks[0].lng!, walks[0].lat!],
+        zoom: cityFocus ? 13 : 10,
+        duration: 900,
+      });
+      return;
+    }
+
+    const city = this.selectedCity();
+    if (
+      cityFocus &&
+      city?.lat != null &&
+      city.lng != null &&
+      Number.isFinite(city.lat) &&
+      Number.isFinite(city.lng)
+    ) {
+      map.flyTo({ center: [city.lng, city.lat], zoom: 12, duration: 900 });
+    } else if (!cityFocus) {
+      map.flyTo({ center: [2.5, 46.6], zoom: 5.1, duration: 700 });
     }
   }
 

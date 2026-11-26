@@ -1,10 +1,11 @@
 // Catalogue filtré par ville sélectionnée.
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { CityPickerComponent } from '../../shared/city-picker/city-picker.component';
 import { City } from '../../shared/city.service';
+import { CitySelectionService } from '../../shared/city-selection.service';
 
 export interface Walk {
   id: number;
@@ -39,7 +40,7 @@ export interface Walk {
       </header>
 
       <div class="filter-bar">
-        <app-city-picker (citySelected)="onCity($event)" />
+        <app-city-picker [initialCity]="selectedCity()" (citySelected)="onCity($event)" />
       </div>
 
       @if (loading()) {
@@ -209,18 +210,27 @@ export interface Walk {
     `,
   ],
 })
-export class CatalogComponent {
+export class CatalogComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly citySelection = inject(CitySelectionService);
 
   protected readonly walks = signal<Walk[]>([]);
   protected readonly loading = signal(false);
   protected readonly selectedCity = signal<City | null>(null);
 
+  ngOnInit(): void {
+    const shared = this.citySelection.selectedCity();
+    if (shared) {
+      this.onCity(shared);
+    }
+  }
+
   protected onCity(city: City): void {
     this.selectedCity.set(city);
+    this.citySelection.setCity(city);
     this.loading.set(true);
     this.http.get<Walk[]>('/api/walks', { params: { cityId: city.id.toString() } }).subscribe({
-      next: walks => {
+      next: (walks) => {
         this.walks.set(walks);
         this.loading.set(false);
       },

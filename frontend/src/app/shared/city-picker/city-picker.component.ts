@@ -1,5 +1,14 @@
 // Champ de recherche ville / code postal avec suggestions.
-import { Component, Output, EventEmitter, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import {
+  Component,
+  Output,
+  EventEmitter,
+  Input,
+  inject,
+  signal,
+  OnInit,
+  OnDestroy,
+} from '@angular/core';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, catchError, of } from 'rxjs';
@@ -90,6 +99,12 @@ import { CityService, City } from '../city.service';
   ],
 })
 export class CityPickerComponent implements OnInit, OnDestroy {
+  @Input() set initialCity(city: City | null | undefined) {
+    if (city?.name) {
+      this.searchCtrl.setValue(city.name, { emitEvent: false });
+    }
+  }
+
   @Output() citySelected = new EventEmitter<City>();
 
   private readonly cityService = inject(CityService);
@@ -103,10 +118,10 @@ export class CityPickerComponent implements OnInit, OnDestroy {
       .pipe(
         debounceTime(300),
         distinctUntilChanged(),
-        switchMap(q => (q && q.length >= 2 ? this.cityService.search(q) : of([]))),
+        switchMap((q) => (q && q.length >= 2 ? this.cityService.search(q) : of([]))),
         catchError(() => of([])),
       )
-      .subscribe(cities => this.results.set(cities));
+      .subscribe((cities) => this.results.set(cities));
   }
 
   ngOnDestroy(): void {
