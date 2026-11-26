@@ -69,6 +69,8 @@ barkwalk:
     signed-url-minutes: 15
   storage:
     local-path: ${STORAGE_LOCAL_PATH:./data/uploads}
+    # HMAC secret for /api/media signed URLs (override in prod via STORAGE_SIGNING_SECRET)
+    signing-secret: ${STORAGE_SIGNING_SECRET:barkwalk-dev-media-signing-secret-change-me}
   stripe:
     api-key: ${STRIPE_API_KEY:}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:}

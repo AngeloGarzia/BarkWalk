@@ -2,13 +2,19 @@ package com.barkwalk.storage;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -17,7 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-// Stockage objet : disque local en dev + URLs /api/media/... ; stubs MinIO conservés pour docs.
+// Stockage objet : disque local en dev + URLs /api/media/... signées HMAC ; stubs MinIO conservés.
 @Service
 public class StorageService {
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
@@ -27,14 +33,18 @@ public class StorageService {
     private final String bucket;
     private final int signedUrlMinutes;
     private final Path localRoot;
+    private final byte[] signingSecret;
 
     public StorageService(
             @Value("${barkwalk.s3.bucket}") String bucket,
             @Value("${barkwalk.s3.signed-url-minutes:15}") int signedUrlMinutes,
-            @Value("${barkwalk.storage.local-path:./data/uploads}") String localPath) throws IOException {
+            @Value("${barkwalk.storage.local-path:./data/uploads}") String localPath,
+            @Value("${barkwalk.storage.signing-secret}") String signingSecret)
+            throws IOException {
         this.bucket = bucket;
         this.signedUrlMinutes = signedUrlMinutes;
         this.localRoot = Path.of(localPath).toAbsolutePath().normalize();
+        this.signingSecret = signingSecret.getBytes(StandardCharsets.UTF_8);
         Files.createDirectories(this.localRoot);
     }
 
@@ -97,7 +107,22 @@ public class StorageService {
     }
 
     public String publicMediaUrl(String storageKey) {
-        return "/api/media/" + storageKey;
+        long exp = Instant.now().plus(Duration.ofMinutes(signedUrlMinutes)).getEpochSecond();
+        String sig = sign(storageKey, exp);
+        return "/api/media/" + storageKey + "?exp=" + exp + "&sig=" + sig;
+    }
+
+    public void assertValidMediaSignature(String storageKey, Long exp, String sig) {
+        if (storageKey == null || storageKey.isBlank() || exp == null || sig == null || sig.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Signature média manquante");
+        }
+        if (Instant.now().getEpochSecond() > exp) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "URL média expirée");
+        }
+        String expected = sign(storageKey, exp);
+        if (!constantTimeEquals(expected, sig)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Signature média invalide");
+        }
     }
 
     /** Dev-friendly signed URL stub (MinIO/S3 wiring can replace this). */
@@ -108,6 +133,23 @@ public class StorageService {
 
     public String signedPutUrl(String storageKey) {
         return signedGetUrl(storageKey) + "&method=PUT";
+    }
+
+    String sign(String storageKey, long exp) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(signingSecret, "HmacSHA256"));
+            byte[] digest = mac.doFinal((storageKey + exp).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to sign media URL", e);
+        }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        byte[] left = a.getBytes(StandardCharsets.UTF_8);
+        byte[] right = b.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(left, right);
     }
 
     private Path resolveSafe(String storageKey) {
