@@ -40,10 +40,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node LTS
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          # Pin: lts/* resolved to Node 26 / npm 11.20 and broke npm ci vs lockfile
+          node-version: "24.12.0"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
