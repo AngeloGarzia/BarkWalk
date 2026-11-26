@@ -1,5 +1,15 @@
-// Sélecteur 1–3 photos : galerie (fichier) ou caméra mobile.
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+// Sélecteur 1–3 photos : galerie (fichier) ou caméra (getUserMedia).
+import {
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  Output,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 export interface PhotoItem {
@@ -43,16 +53,14 @@ export interface PhotoItem {
                   [disabled]="uploading()"
                 />
               </label>
-              <label class="pick camera">
+              <button
+                type="button"
+                class="pick camera"
+                (click)="openCamera()"
+                [disabled]="uploading() || cameraOpen()"
+              >
                 Caméra
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  (change)="onFile($event)"
-                  [disabled]="uploading()"
-                />
-              </label>
+              </button>
             </div>
             @if (uploading()) {
               <span class="hint">Envoi…</span>
@@ -62,6 +70,21 @@ export interface PhotoItem {
           </li>
         }
       </ul>
+
+      @if (cameraOpen()) {
+        <div class="camera-overlay" role="dialog" aria-modal="true" aria-label="Prise de photo">
+          <div class="camera-panel">
+            <video #preview autoplay playsinline muted></video>
+            <canvas #snap hidden></canvas>
+            <div class="camera-actions">
+              <button type="button" class="pick camera" (click)="takePhoto()" [disabled]="uploading()">
+                Prendre la photo
+              </button>
+              <button type="button" class="pick cancel" (click)="closeCamera()">Annuler</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [
@@ -121,7 +144,7 @@ export interface PhotoItem {
         height: 1.6rem;
         border: none;
         border-radius: 50%;
-        background: rgba(26, 31, 26, 0.72);
+        background: rgba(26, 31, 26,.72);
         color: #fff;
         font-size: 1.1rem;
         line-height: 1;
@@ -139,16 +162,28 @@ export interface PhotoItem {
         display: grid;
         place-items: center;
         min-height: 1.85rem;
+        border: none;
         border-radius: var(--radius-pill);
         background: var(--forest);
         color: var(--on-forest);
         font-size: 0.72rem;
         font-weight: 700;
         cursor: pointer;
+        width: 100%;
+        font-family: inherit;
       }
       .pick.camera {
         background: var(--cta);
         color: var(--on-cta);
+      }
+      .pick.cancel {
+        background: transparent;
+        color: var(--muted);
+        border: 1px solid var(--line);
+      }
+      .pick:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
       }
       .pick input {
         position: absolute;
@@ -170,11 +205,46 @@ export interface PhotoItem {
         font-size: 0.82rem;
         margin: 0 0 0.5rem;
       }
+      .camera-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        background: rgba(20, 24, 20, 0.72);
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+      }
+      .camera-panel {
+        width: min(28rem, 100%);
+        background: var(--surface, #fff);
+        border-radius: var(--radius-md);
+        padding: 0.75rem;
+        box-shadow: var(--shadow-sm);
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+      }
+      .camera-panel video {
+        width: 100%;
+        max-height: 60vh;
+        border-radius: var(--radius-sm);
+        background: #111;
+        object-fit: cover;
+      }
+      .camera-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
     `,
   ],
 })
 export class PhotoUploaderComponent {
   private readonly http = inject(HttpClient);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  @ViewChild('preview') private previewRef?: ElementRef<HTMLVideoElement>;
+  @ViewChild('snap') private snapRef?: ElementRef<HTMLCanvasElement>;
 
   @Input({ required: true }) uploadUrl!: string;
   @Input() deleteUrlBase?: string;
@@ -189,6 +259,68 @@ export class PhotoUploaderComponent {
   protected readonly photos = signal<PhotoItem[]>([]);
   protected readonly uploading = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly cameraOpen = signal(false);
+
+  private stream: MediaStream | null = null;
+
+  protected async openCamera(): Promise<void> {
+    this.error.set(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.error.set('Caméra non disponible sur cet appareil.');
+      return;
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: true,
+      });
+      this.cameraOpen.set(true);
+      this.cdr.detectChanges();
+      const video = this.previewRef?.nativeElement;
+      if (video) {
+        video.srcObject = this.stream;
+        await video.play().catch(() => undefined);
+      }
+    } catch {
+      this.closeCamera();
+      this.error.set('Impossible d’accéder à la caméra (permission refusée ?).');
+    }
+  }
+
+  protected closeCamera(): void {
+    this.stopStream();
+    this.cameraOpen.set(false);
+  }
+
+  protected takePhoto(): void {
+    const video = this.previewRef?.nativeElement;
+    const canvas = this.snapRef?.nativeElement;
+    if (!video || !canvas || !video.videoWidth) {
+      this.error.set('Flux caméra pas encore prêt.');
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      this.error.set('Capture impossible.');
+      return;
+    }
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          this.error.set('Capture impossible.');
+          return;
+        }
+        this.closeCamera();
+        const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        this.uploadFile(file);
+      },
+      'image/jpeg',
+      0.92,
+    );
+  }
 
   protected onFile(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -197,6 +329,22 @@ export class PhotoUploaderComponent {
     if (!file) {
       return;
     }
+    this.uploadFile(file);
+  }
+
+  protected remove(photoId: number): void {
+    const base = this.deleteUrlBase ?? this.uploadUrl;
+    this.http.delete(`${base}/${photoId}`).subscribe({
+      next: () => {
+        const next = this.photos().filter((p) => p.id !== photoId);
+        this.photos.set(next);
+        this.photosChange.emit(next);
+      },
+      error: () => this.error.set('Suppression impossible'),
+    });
+  }
+
+  private uploadFile(file: File): void {
     if (this.photos().length >= this.max) {
       this.error.set(`Maximum ${this.max} photos`);
       return;
@@ -229,15 +377,12 @@ export class PhotoUploaderComponent {
     });
   }
 
-  protected remove(photoId: number): void {
-    const base = this.deleteUrlBase ?? this.uploadUrl;
-    this.http.delete(`${base}/${photoId}`).subscribe({
-      next: () => {
-        const next = this.photos().filter((p) => p.id !== photoId);
-        this.photos.set(next);
-        this.photosChange.emit(next);
-      },
-      error: () => this.error.set('Suppression impossible'),
-    });
+  private stopStream(): void {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    const video = this.previewRef?.nativeElement;
+    if (video) {
+      video.srcObject = null;
+    }
   }
 }
