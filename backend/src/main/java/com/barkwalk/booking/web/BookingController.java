@@ -36,4 +36,11 @@ public class BookingController {
     public BookingResponse cancel(@PathVariable Long id) {
         return bookingService.cancel(id);
     }
+
+    public record StaffCancelBody(String reason) {}
+
+    @PostMapping("/{id}/cancel-by-staff")
+    public BookingResponse cancelByStaff(@PathVariable Long id, @RequestBody(required = false) StaffCancelBody body) {
+        return bookingService.cancelByStaff(id, body != null ? body.reason() : null);
+    }
 }

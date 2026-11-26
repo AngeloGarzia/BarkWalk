@@ -18,6 +18,10 @@ public class Payment {
     @Column(nullable = false) private String status;
     @JsonIgnore @Column(name = "stripe_payment_intent") private String stripePaymentIntent;
     @JsonIgnore @Column(name = "commission_cents", nullable = false) private int commissionCents;
+    @Column(name = "refund_amount_cents") private Integer refundAmountCents;
+    @Column(name = "refund_provider_id") private String refundProviderId;
+    @Column(name = "refunded_at") private Instant refundedAt;
+    @Column(name = "refund_reason") private String refundReason;
     @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
     public Long getId() { return id; }
     public Long getUserId() { return userId; }
@@ -37,5 +41,13 @@ public class Payment {
     public void setStripePaymentIntent(String v) { this.stripePaymentIntent = v; }
     public int getCommissionCents() { return commissionCents; }
     public void setCommissionCents(int commissionCents) { this.commissionCents = commissionCents; }
+    public Integer getRefundAmountCents() { return refundAmountCents; }
+    public void setRefundAmountCents(Integer refundAmountCents) { this.refundAmountCents = refundAmountCents; }
+    public String getRefundProviderId() { return refundProviderId; }
+    public void setRefundProviderId(String refundProviderId) { this.refundProviderId = refundProviderId; }
+    public Instant getRefundedAt() { return refundedAt; }
+    public void setRefundedAt(Instant refundedAt) { this.refundedAt = refundedAt; }
+    public String getRefundReason() { return refundReason; }
+    public void setRefundReason(String refundReason) { this.refundReason = refundReason; }
     public Instant getCreatedAt() { return createdAt; }
 }

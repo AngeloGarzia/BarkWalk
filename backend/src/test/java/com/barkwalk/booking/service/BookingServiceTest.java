@@ -15,11 +15,14 @@ import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.admin.service.BusinessSettingsService;
+import com.barkwalk.common.NotificationService;
 import com.barkwalk.dog.service.DogDossierService;
+import com.barkwalk.payment.repository.PaymentRepository;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.service.DogWalkCompatibilityService;
+import com.barkwalk.walker.repository.WalkerProfileRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -49,6 +52,12 @@ class BookingServiceTest {
     private DogWalkCompatibilityService compatibilityService;
     @Mock
     private BusinessSettingsService businessSettingsService;
+    @Mock
+    private PaymentRepository paymentRepository;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private WalkerProfileRepository walkerProfileRepository;
 
     @InjectMocks
     private BookingService bookingService;
@@ -62,6 +71,7 @@ class BookingServiceTest {
                 .when(compatibilityService)
                 .assertCompatible(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         org.mockito.Mockito.lenient().when(businessSettingsService.pendingPaymentMinutes()).thenReturn(15);
+        org.mockito.Mockito.lenient().when(businessSettingsService.cancellationFreeHours()).thenReturn(24);
     }
 
     @AfterEach
@@ -142,17 +152,66 @@ class BookingServiceTest {
     }
 
     @Test
-    void cancel_marksCancelledFree() {
+    void cancel_marksCancelledFreeWhenBeforeDeadline() {
         Booking booking = new Booking();
         booking.setUserId(1L);
         booking.setWalkId(10L);
         booking.setDogId(5L);
         booking.setStatus("CONFIRMED");
         when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        Walk walk = staffWalk(10L, 8);
+        walk.setStartsAt(java.time.Instant.now().plus(java.time.Duration.ofHours(30)));
+        when(walkRepository.findById(10L)).thenReturn(Optional.of(walk));
 
         var response = bookingService.cancel(3L);
         assertThat(response.status()).isEqualTo("CANCELLED_FREE");
         assertThat(booking.getCancelledByRole()).isEqualTo("USER");
+        assertThat(booking.isCountsTowardMembershipQuota()).isFalse();
+    }
+
+    @Test
+    void cancel_marksCancelledLateWhenInside24h() {
+        Booking booking = new Booking();
+        booking.setUserId(1L);
+        booking.setWalkId(10L);
+        booking.setStatus("CONFIRMED");
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        Walk walk = staffWalk(10L, 8);
+        walk.setStartsAt(java.time.Instant.now().plus(java.time.Duration.ofHours(10)));
+        when(walkRepository.findById(10L)).thenReturn(Optional.of(walk));
+
+        var response = bookingService.cancel(3L);
+        assertThat(response.status()).isEqualTo("CANCELLED_LATE");
+        assertThat(booking.isCountsTowardMembershipQuota()).isTrue();
+        assertThat(booking.isCountsTowardOrgThreshold()).isTrue();
+    }
+
+    @Test
+    void cancelByStaff_refundsAndNotifies() {
+        SecurityTestSupport.clear();
+        SecurityTestSupport.authenticate(2L, "admin@example.com", Role.USER, Role.ADMIN);
+        Booking booking = new Booking();
+        try {
+            var f = Booking.class.getDeclaredField("id");
+            f.setAccessible(true);
+            f.set(booking, 3L);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+        booking.setUserId(1L);
+        booking.setWalkId(10L);
+        booking.setStatus("CONFIRMED");
+        booking.setPaymentRequired(true);
+        booking.setPriceCents(1500);
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        Walk walk = staffWalk(10L, 8);
+        when(walkRepository.findById(10L)).thenReturn(Optional.of(walk));
+        when(paymentRepository.findByBookingId(3L)).thenReturn(Optional.empty());
+
+        var response = bookingService.cancelByStaff(3L, "weather");
+        assertThat(response.status()).isEqualTo("CANCELLED_FREE");
+        assertThat(booking.getCancelledByRole()).isEqualTo("ADMIN");
+        verify(notificationService).notifyWalkCancelledByStaff(10L, 1L, "weather");
     }
 
     @Test

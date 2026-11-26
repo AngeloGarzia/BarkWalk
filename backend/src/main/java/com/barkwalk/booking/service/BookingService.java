@@ -7,14 +7,18 @@ import com.barkwalk.booking.dto.BookingDtos.BookingResponse;
 import com.barkwalk.admin.service.BusinessSettingsService;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
+import com.barkwalk.common.NotificationService;
 import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.dog.service.DogDossierService;
+import com.barkwalk.payment.domain.Payment;
+import com.barkwalk.payment.repository.PaymentRepository;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.service.DogWalkCompatibilityService;
+import com.barkwalk.walker.repository.WalkerProfileRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +37,9 @@ public class BookingService {
     private final DogDossierService dogDossierService;
     private final DogWalkCompatibilityService compatibilityService;
     private final BusinessSettingsService businessSettingsService;
+    private final PaymentRepository paymentRepository;
+    private final NotificationService notificationService;
+    private final WalkerProfileRepository walkerProfileRepository;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -41,7 +48,10 @@ public class BookingService {
             DogRepository dogRepository,
             DogDossierService dogDossierService,
             DogWalkCompatibilityService compatibilityService,
-            BusinessSettingsService businessSettingsService) {
+            BusinessSettingsService businessSettingsService,
+            PaymentRepository paymentRepository,
+            NotificationService notificationService,
+            WalkerProfileRepository walkerProfileRepository) {
         this.bookingRepository = bookingRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.walkRepository = walkRepository;
@@ -49,6 +59,9 @@ public class BookingService {
         this.dogDossierService = dogDossierService;
         this.compatibilityService = compatibilityService;
         this.businessSettingsService = businessSettingsService;
+        this.paymentRepository = paymentRepository;
+        this.notificationService = notificationService;
+        this.walkerProfileRepository = walkerProfileRepository;
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
@@ -152,13 +165,79 @@ public class BookingService {
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        // Pour l'instant toute annulation utilisateur est marquée gratuite.
-        // Le basculement tardif (comptage quota et seuil organisateur) se calcule à partir de starts_at.
+        Walk walk = walkRepository.findById(booking.getWalkId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Walk not found"));
+        Instant now = Instant.now();
+        int freeHours = businessSettingsService.cancellationFreeHours();
+        Instant freeUntil = walk.getStartsAt().minus(Duration.ofHours(freeHours));
+        booking.setCancelledAt(now);
+        booking.setCancelledByUserId(SecurityUtils.currentUserId());
+        booking.setCancelledByRole("USER");
+        if (now.isBefore(freeUntil)) {
+            // R4 : annulation gratuite jusqu'à X h avant.
+            booking.setStatus("CANCELLED_FREE");
+        } else {
+            // R4 : au-delà — pas de remboursement, balade comptée.
+            booking.setStatus("CANCELLED_LATE");
+            booking.setCountsTowardOrgThreshold(true);
+            booking.setCountsTowardMembershipQuota(true);
+        }
+        return toResponse(booking);
+    }
+
+    /** R5 : annulation organisateur / encadrant / admin → remboursement intégral + email. */
+    @Transactional
+    public BookingResponse cancelByStaff(Long id, String reason) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Walk walk = walkRepository.findById(booking.getWalkId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Walk not found"));
+        String role = requireStaffCanceller(walk);
         booking.setStatus("CANCELLED_FREE");
         booking.setCancelledAt(Instant.now());
         booking.setCancelledByUserId(SecurityUtils.currentUserId());
-        booking.setCancelledByRole("USER");
+        booking.setCancelledByRole(role);
+        booking.setCancellationReason(reason);
+        booking.setCountsTowardOrgThreshold(false);
+        booking.setCountsTowardMembershipQuota(false);
+        refundFully(booking, reason != null ? reason : "cancelled_by_staff");
+        notificationService.notifyWalkCancelledByStaff(walk.getId(), booking.getUserId(), reason);
         return toResponse(booking);
+    }
+
+    private String requireStaffCanceller(Walk walk) {
+        var principal = SecurityUtils.currentUser();
+        if (principal.getRoles().contains(Role.ADMIN)) {
+            return "ADMIN";
+        }
+        if (walk.getOrganizerUserId() != null && walk.getOrganizerUserId().equals(principal.getId())) {
+            return "ORGANIZER";
+        }
+        if (walk.getWalkerId() != null) {
+            boolean assigned = walkerProfileRepository.findByUserId(principal.getId())
+                    .map(wp -> walk.getWalkerId().equals(wp.getId()))
+                    .orElse(false);
+            if (assigned) {
+                return "WALKER";
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to cancel this booking");
+    }
+
+    private void refundFully(Booking booking, String reason) {
+        if (!booking.isPaymentRequired() || booking.getPriceCents() <= 0) {
+            return;
+        }
+        paymentRepository.findByBookingId(booking.getId()).ifPresent(payment -> {
+            if (payment.getRefundedAt() != null) {
+                return;
+            }
+            payment.setRefundAmountCents(payment.getAmountCents());
+            payment.setRefundedAt(Instant.now());
+            payment.setRefundReason(reason);
+            payment.setRefundProviderId("stub-full-refund");
+            paymentRepository.save(payment);
+        });
     }
 
     /** Confirmation serveur uniquement (webhook) — idempotente. */
