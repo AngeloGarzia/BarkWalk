@@ -2,6 +2,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, shareReplay, tap, throwError } from 'rxjs';
+import { decodeJwtPayload } from './jwt.util';
 
 export interface AuthResponse {
   accessToken: string;
@@ -32,15 +33,15 @@ function rolesFromJwt(token: string | null): string[] {
   if (!token) {
     return [];
   }
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]!)) as { roles?: unknown };
-    if (Array.isArray(payload.roles)) {
-      return payload.roles.filter((r): r is string => typeof r === 'string');
-    }
-    return [];
-  } catch {
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
     return [];
   }
+  const roles = payload['roles'];
+  if (Array.isArray(roles)) {
+    return roles.filter((r): r is string => typeof r === 'string');
+  }
+  return [];
 }
 
 @Injectable({ providedIn: 'root' })

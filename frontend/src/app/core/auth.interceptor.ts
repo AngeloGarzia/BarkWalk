@@ -4,17 +4,18 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
+import { decodeJwtPayload } from './jwt.util';
 
 function isJwtExpired(token: string | null): boolean {
   if (!token) {
     return true;
   }
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]!)) as { exp?: number };
-    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
-  } catch {
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
     return true;
   }
+  const exp = payload['exp'];
+  return typeof exp === 'number' && exp * 1000 < Date.now();
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
