@@ -12,6 +12,7 @@ import com.barkwalk.booking.dto.BookingDtos.BookingResponse;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.service.BookingService;
 import com.barkwalk.common.Role;
+import com.barkwalk.membership.service.MembershipService;
 import com.barkwalk.payment.domain.Payment;
 import com.barkwalk.payment.domain.WebhookEvent;
 import com.barkwalk.payment.repository.PaymentRepository;
@@ -47,6 +48,8 @@ class PaymentServiceTest {
     @Mock
     private BookingService bookingService;
     @Mock
+    private MembershipService membershipService;
+    @Mock
     private CommissionCalculator commissionCalculator;
 
     private PaymentService service;
@@ -59,6 +62,7 @@ class PaymentServiceTest {
                 bookingRepository,
                 walkRepository,
                 bookingService,
+                membershipService,
                 commissionCalculator,
                 "");
     }
@@ -76,6 +80,7 @@ class PaymentServiceTest {
                 bookingRepository,
                 walkRepository,
                 bookingService,
+                membershipService,
                 commissionCalculator,
                 "whsec");
         assertThatThrownBy(() -> secured.handleWebhook(null, Map.of("id", "evt_1")))

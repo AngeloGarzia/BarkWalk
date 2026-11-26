@@ -15,4 +15,6 @@ import jakarta.persistence.LockModeType;
 
 public interface MembershipRepository extends JpaRepository<Membership, Long> {
     Optional<Membership> findFirstByUserIdAndStatusOrderByCreatedAtDesc(Long userId, String status);
+
+    List<Membership> findByStatusAndCurrentPeriodEndBefore(String status, Instant before);
 }

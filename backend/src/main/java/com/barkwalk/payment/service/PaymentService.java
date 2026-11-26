@@ -4,6 +4,8 @@ import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.service.BookingService;
 import com.barkwalk.common.SecurityUtils;
+import com.barkwalk.membership.domain.Membership;
+import com.barkwalk.membership.service.MembershipService;
 import com.barkwalk.payment.domain.Payment;
 import com.barkwalk.payment.domain.WebhookEvent;
 import com.barkwalk.payment.dto.PaymentDtos.PaymentResponse;
@@ -27,6 +29,7 @@ public class PaymentService {
     private final BookingRepository bookingRepository;
     private final WalkRepository walkRepository;
     private final BookingService bookingService;
+    private final MembershipService membershipService;
     private final CommissionCalculator commissionCalculator;
     private final String webhookSecret;
 
@@ -36,6 +39,7 @@ public class PaymentService {
             BookingRepository bookingRepository,
             WalkRepository walkRepository,
             BookingService bookingService,
+            MembershipService membershipService,
             CommissionCalculator commissionCalculator,
             @Value("${barkwalk.stripe.webhook-secret:}") String webhookSecret) {
         this.webhookEventRepository = webhookEventRepository;
@@ -43,6 +47,7 @@ public class PaymentService {
         this.bookingRepository = bookingRepository;
         this.walkRepository = walkRepository;
         this.bookingService = bookingService;
+        this.membershipService = membershipService;
         this.commissionCalculator = commissionCalculator;
         this.webhookSecret = webhookSecret;
     }
@@ -74,9 +79,37 @@ public class PaymentService {
                     bookingService.confirmPayment(id);
                     recordBookingPayment(id, obj);
                 }
+                Object membershipId = obj.get("membership_id");
+                if (membershipId != null) {
+                    Long id = Long.valueOf(membershipId.toString());
+                    Membership membership = membershipService.activateOnPayment(id);
+                    recordMembershipPayment(membership, obj);
+                }
             }
         }
         return new WebhookAck("ok");
+    }
+
+    private void recordMembershipPayment(Membership membership, Map<?, ?> stripeObject) {
+        if (paymentRepository.findByMembershipId(membership.getId()).isPresent()) {
+            return;
+        }
+        Payment payment = new Payment();
+        payment.setUserId(membership.getUserId());
+        payment.setMembershipId(membership.getId());
+        payment.setAmountCents(0);
+        payment.setPaymentType("MEMBERSHIP");
+        payment.setStatus("SUCCEEDED");
+        Object intent = stripeObject.get("id");
+        if (intent != null) {
+            payment.setStripePaymentIntent(intent.toString());
+        }
+        payment.setCommissionCents(0);
+        Object amount = stripeObject.get("amount_cents");
+        if (amount != null) {
+            payment.setAmountCents(Integer.parseInt(amount.toString()));
+        }
+        paymentRepository.save(payment);
     }
 
     private void recordBookingPayment(Long bookingId, Map<?, ?> stripeObject) {

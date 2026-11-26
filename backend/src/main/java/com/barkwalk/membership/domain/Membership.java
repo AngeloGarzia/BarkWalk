@@ -36,4 +36,5 @@ public class Membership {
     public void setStripeCustomerId(String v) { this.stripeCustomerId = v; }
     public boolean isCancelAtPeriodEnd() { return cancelAtPeriodEnd; }
     public void setCancelAtPeriodEnd(boolean v) { this.cancelAtPeriodEnd = v; }
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }
