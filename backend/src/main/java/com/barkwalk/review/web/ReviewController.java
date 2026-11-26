@@ -19,4 +19,11 @@ public class ReviewController {
     public ReviewResponse create(@Valid @RequestBody ReviewRequest request) {
         return reviewService.create(request);
     }
+
+    public record ReplyBody(String reply) {}
+
+    @PostMapping("/{id}/reply")
+    public ReviewResponse reply(@PathVariable Long id, @RequestBody ReplyBody body) {
+        return reviewService.reply(id, body != null ? body.reply() : null);
+    }
 }

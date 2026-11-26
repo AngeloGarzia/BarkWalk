@@ -56,13 +56,13 @@ public class ReviewService {
         if (walk.getStartsAt().plus(days, ChronoUnit.DAYS).isBefore(Instant.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Review window closed");
         }
+        // R13 : les deux doivent avoir une réservation TERMINÉE sur la même balade.
         boolean authorOk = bookingRepository.findByWalkId(request.walkId()).stream()
-                .anyMatch(b -> b.getUserId().equals(authorId)
-                        && ("COMPLETED".equals(b.getStatus()) || "CONFIRMED".equals(b.getStatus())));
+                .anyMatch(b -> b.getUserId().equals(authorId) && "COMPLETED".equals(b.getStatus()));
         boolean targetOk = bookingRepository.findByWalkId(request.walkId()).stream()
-                .anyMatch(b -> b.getUserId().equals(request.targetUserId()));
+                .anyMatch(b -> b.getUserId().equals(request.targetUserId()) && "COMPLETED".equals(b.getStatus()));
         if (!authorOk || !targetOk) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Both users must have participated");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Both users must have completed the walk");
         }
         Review review = new Review();
         review.setWalkId(request.walkId());
@@ -73,6 +73,20 @@ public class ReviewService {
         Review saved = reviewRepository.save(review);
         communityOrgService.evaluateRevocation(request.targetUserId());
         return toResponse(saved);
+    }
+
+    @Transactional
+    public ReviewResponse reply(Long reviewId, String reply) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!review.getTargetUserId().equals(SecurityUtils.currentUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the rated user can reply");
+        }
+        if (reply == null || reply.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reply required");
+        }
+        review.setReply(reply.trim());
+        return toResponse(review);
     }
 
     private ReviewResponse toResponse(Review r) {

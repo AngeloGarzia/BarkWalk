@@ -15,5 +15,8 @@ import jakarta.persistence.LockModeType;
 
 public interface ConversationMemberRepository extends JpaRepository<ConversationMember, com.barkwalk.messaging.domain.ConversationMember.Pk> {
     List<ConversationMember> findByUserId(Long userId);
-        boolean existsByConversationIdAndUserId(Long conversationId, Long userId);
+
+    List<ConversationMember> findByConversationId(Long conversationId);
+
+    boolean existsByConversationIdAndUserId(Long conversationId, Long userId);
 }

@@ -44,4 +44,9 @@ public class MessagingController {
     public void block(@PathVariable Long userId) {
         messagingService.block(userId);
     }
+
+    @GetMapping("/admin/conversations/{id}")
+    public List<MessageResponse> adminRead(@PathVariable Long id, @RequestParam Long reportId) {
+        return messagingService.adminReadForReport(id, reportId);
+    }
 }

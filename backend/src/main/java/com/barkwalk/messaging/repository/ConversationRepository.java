@@ -14,4 +14,6 @@ import jakarta.persistence.LockModeType;
 // Accès conversations.
 
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
+    List<Conversation> findByConversationTypeAndArchivedAtIsNullAndCreatedAtBefore(
+            String conversationType, Instant before);
 }
