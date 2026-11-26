@@ -68,6 +68,10 @@ public class Booking {
     @Column(name = "counts_toward_membership_quota", nullable = false)
     private boolean countsTowardMembershipQuota;
 
+    /** R16 : réservation future à traiter après expiration du dossier chien. */
+    @Column(name = "admin_alert", nullable = false)
+    private boolean adminAlert;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -216,5 +220,13 @@ public class Booking {
 
     public void setCountsTowardMembershipQuota(boolean countsTowardMembershipQuota) {
         this.countsTowardMembershipQuota = countsTowardMembershipQuota;
+    }
+
+    public boolean isAdminAlert() {
+        return adminAlert;
+    }
+
+    public void setAdminAlert(boolean adminAlert) {
+        this.adminAlert = adminAlert;
     }
 }

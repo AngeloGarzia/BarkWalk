@@ -14,6 +14,7 @@ import com.barkwalk.booking.dto.BookingDtos.BookingRequest;
 import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
@@ -40,6 +41,8 @@ class BookingServiceTest {
     private WalkRepository walkRepository;
     @Mock
     private DogRepository dogRepository;
+    @Mock
+    private DogDossierService dogDossierService;
 
     @InjectMocks
     private BookingService bookingService;
@@ -47,6 +50,7 @@ class BookingServiceTest {
     @BeforeEach
     void auth() {
         SecurityTestSupport.authenticate(1L, "owner@example.com", Role.USER, Role.MEMBER);
+        org.mockito.Mockito.lenient().doNothing().when(dogDossierService).assertBookable(org.mockito.ArgumentMatchers.any());
     }
 
     @AfterEach
@@ -86,6 +90,26 @@ class BookingServiceTest {
         dog.setDossierStatus("DRAFT");
         when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
         when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dog dossier not validated"))
+                .when(dogDossierService)
+                .assertBookable(dog);
+
+        assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void create_rejectsExpiredDog() {
+        Walk walk = staffWalk(10L, 8);
+        Dog dog = validatedDog(5L, 1L);
+        dog.setDossierStatus("EXPIRED");
+        when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dog dossier expired"))
+                .when(dogDossierService)
+                .assertBookable(dog);
 
         assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, false)))
                 .isInstanceOf(ResponseStatusException.class)

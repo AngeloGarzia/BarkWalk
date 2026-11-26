@@ -156,7 +156,7 @@ Table dogs {
   leash_pulling varchar(20)
   attention_notes text
   danger_category varchar(5)
-  dossier_status varchar(30) [not null, default: 'DRAFT']
+  dossier_status varchar(30) [not null, default: 'DRAFT', note: 'DRAFT|PENDING|VALIDATED|REFUSED|EXPIRED']
   validated_by bigint [ref: > users.id]
   validated_at timestamptz
   refusal_reason text
@@ -331,6 +331,7 @@ Table bookings {
   cancellation_reason text
   counts_toward_org_threshold boolean [not null, default: false]
   counts_toward_membership_quota boolean [not null, default: false]
+  admin_alert boolean [not null, default: false, note: 'R16 signalement admin si dossier chien expire']
   confirmed_at timestamptz
   cancelled_at timestamptz
   created_at timestamptz [not null]

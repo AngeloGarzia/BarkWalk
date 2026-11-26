@@ -26,13 +26,19 @@ public class DogService {
     private final DogDocumentRepository documentRepository;
     private final StorageService storageService;
     private final AuditService auditService;
+    private final DogDossierService dogDossierService;
 
-    public DogService(DogRepository dogRepository, DogDocumentRepository documentRepository,
-                      StorageService storageService, AuditService auditService) {
+    public DogService(
+            DogRepository dogRepository,
+            DogDocumentRepository documentRepository,
+            StorageService storageService,
+            AuditService auditService,
+            DogDossierService dogDossierService) {
         this.dogRepository = dogRepository;
         this.documentRepository = documentRepository;
         this.storageService = storageService;
         this.auditService = auditService;
+        this.dogDossierService = dogDossierService;
     }
 
     @Transactional(readOnly = true)
@@ -83,6 +89,8 @@ public class DogService {
     public DogResponse validate(Long id) {
         requireAdmin();
         Dog dog = dogRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        // R2 : validation admin seulement si vaccination + assurance RC validées et non expirées.
+        dogDossierService.assertReadyForAdminValidation(id);
         dog.setDossierStatus("VALIDATED");
         dog.setRefusalReason(null);
         dog.setUpdatedAt(Instant.now());

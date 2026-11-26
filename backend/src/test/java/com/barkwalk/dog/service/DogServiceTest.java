@@ -42,6 +42,8 @@ class DogServiceTest {
     private StorageService storageService;
     @Mock
     private AuditService auditService;
+    @Mock
+    private DogDossierService dogDossierService;
 
     @InjectMocks
     private DogService dogService;
@@ -49,6 +51,10 @@ class DogServiceTest {
     @BeforeEach
     void auth() {
         SecurityTestSupport.authenticate(1L, "owner@example.com", Role.USER);
+        org.mockito.Mockito.lenient()
+                .doNothing()
+                .when(dogDossierService)
+                .assertReadyForAdminValidation(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @AfterEach
@@ -104,7 +110,25 @@ class DogServiceTest {
         when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
         var response = dogService.validate(5L);
         assertThat(response.dossierStatus()).isEqualTo("VALIDATED");
+        verify(dogDossierService).assertReadyForAdminValidation(5L);
         verify(auditService).log(eq(2L), eq("DOG_VALIDATE"), eq("DOG"), eq(5L), eq(null));
+    }
+
+    @Test
+    void validate_rejectsWithoutRequiredDocs() {
+        SecurityTestSupport.clear();
+        SecurityTestSupport.authenticate(2L, "admin@example.com", Role.USER, Role.ADMIN);
+        Dog dog = ownedDog(5L, 1L);
+        dog.setDossierStatus("PENDING");
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        org.mockito.Mockito.doThrow(new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Vaccination and insurance must be validated and not expired"))
+                .when(dogDossierService)
+                .assertReadyForAdminValidation(5L);
+        assertThatThrownBy(() -> dogService.validate(5L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

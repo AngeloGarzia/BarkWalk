@@ -4,7 +4,10 @@ import com.barkwalk.city.domain.City;
 import com.barkwalk.city.repository.CityRepository;
 import com.barkwalk.common.Role;
 import com.barkwalk.dog.domain.Dog;
+import com.barkwalk.dog.domain.DogDocument;
+import com.barkwalk.dog.repository.DogDocumentRepository;
 import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.membership.domain.Membership;
 import com.barkwalk.membership.domain.MembershipPlan;
 import com.barkwalk.membership.repository.MembershipPlanRepository;
@@ -231,6 +234,7 @@ public class DemoDataInitializer implements ApplicationRunner {
     private final MembershipPlanRepository planRepository;
     private final MembershipRepository membershipRepository;
     private final DogRepository dogRepository;
+    private final DogDocumentRepository dogDocumentRepository;
     private final WalkerProfileRepository walkerProfileRepository;
     private final MeetingPointRepository meetingPointRepository;
     private final WalkRepository walkRepository;
@@ -243,6 +247,7 @@ public class DemoDataInitializer implements ApplicationRunner {
             MembershipPlanRepository planRepository,
             MembershipRepository membershipRepository,
             DogRepository dogRepository,
+            DogDocumentRepository dogDocumentRepository,
             WalkerProfileRepository walkerProfileRepository,
             MeetingPointRepository meetingPointRepository,
             WalkRepository walkRepository) {
@@ -253,6 +258,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         this.planRepository = planRepository;
         this.membershipRepository = membershipRepository;
         this.dogRepository = dogRepository;
+        this.dogDocumentRepository = dogDocumentRepository;
         this.walkerProfileRepository = walkerProfileRepository;
         this.meetingPointRepository = meetingPointRepository;
         this.walkRepository = walkRepository;
@@ -277,6 +283,7 @@ public class DemoDataInitializer implements ApplicationRunner {
         aliceProfile.setCommunityOrgStatus("ACTIVE");
         aliceProfile.setPhone("+33600000001");
 
+        Dog rex;
         if (dogRepository.findByOwnerIdOrderByNameAsc(alice.getId()).isEmpty()) {
             Dog dog = new Dog();
             dog.setOwnerId(alice.getId());
@@ -291,8 +298,11 @@ public class DemoDataInitializer implements ApplicationRunner {
             dog.setSociabilityDogs("GOOD");
             dog.setSociabilityHumans("GOOD");
             dog.setDossierStatus("VALIDATED");
-            dogRepository.save(dog);
+            rex = dogRepository.save(dog);
+        } else {
+            rex = dogRepository.findByOwnerIdOrderByNameAsc(alice.getId()).getFirst();
         }
+        ensureValidatedRequiredDocs(rex);
 
         MembershipPlan monthly = planRepository.findByActiveTrue().stream()
                 .filter(p -> "MONTHLY".equals(p.getCode()))
@@ -399,5 +409,23 @@ public class DemoDataInitializer implements ApplicationRunner {
         profile.setUpdatedAt(Instant.now());
         profileRepository.save(profile);
         return user;
+    }
+
+    /** R2 : démo avec vaccination + assurance RC validées (sinon réservation bloquée). */
+    private void ensureValidatedRequiredDocs(Dog dog) {
+        var existing = dogDocumentRepository.findByDogId(dog.getId());
+        for (String type : DogDossierService.REQUIRED_DOC_TYPES) {
+            boolean present = existing.stream().anyMatch(d -> type.equals(d.getDocType()));
+            if (present) {
+                continue;
+            }
+            DogDocument doc = new DogDocument();
+            doc.setDogId(dog.getId());
+            doc.setDocType(type);
+            doc.setStorageKey("demo/dogs/" + dog.getId() + "/" + type.toLowerCase() + "-validated.pdf");
+            doc.setExpiresAt(LocalDate.now().plusYears(1));
+            doc.setStatus("VALIDATED");
+            dogDocumentRepository.save(doc);
+        }
     }
 }

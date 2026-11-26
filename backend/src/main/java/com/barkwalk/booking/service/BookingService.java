@@ -10,6 +10,7 @@ import com.barkwalk.common.Role;
 import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.dog.service.DogDossierService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import java.time.Duration;
@@ -28,13 +29,19 @@ public class BookingService {
     private final WaitlistEntryRepository waitlistEntryRepository;
     private final WalkRepository walkRepository;
     private final DogRepository dogRepository;
+    private final DogDossierService dogDossierService;
 
-    public BookingService(BookingRepository bookingRepository, WaitlistEntryRepository waitlistEntryRepository,
-                          WalkRepository walkRepository, DogRepository dogRepository) {
+    public BookingService(
+            BookingRepository bookingRepository,
+            WaitlistEntryRepository waitlistEntryRepository,
+            WalkRepository walkRepository,
+            DogRepository dogRepository,
+            DogDossierService dogDossierService) {
         this.bookingRepository = bookingRepository;
         this.waitlistEntryRepository = waitlistEntryRepository;
         this.walkRepository = walkRepository;
         this.dogRepository = dogRepository;
+        this.dogDossierService = dogDossierService;
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
@@ -51,9 +58,8 @@ public class BookingService {
         if (!dog.getOwnerId().equals(userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Dog not owned");
         }
-        if (!"VALIDATED".equals(dog.getDossierStatus())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dog dossier not validated");
-        }
+        // R2 / R16 : dossier validé + vaccins/RC non expirés (sinon EXPIRED / refus).
+        dogDossierService.assertBookable(dog);
         if (!contains(walk.getAcceptedSizes(), dog.getSizeCategory())
                 || !contains(walk.getAcceptedEnergy(), dog.getEnergyLevel())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dog incompatible with walk profile");

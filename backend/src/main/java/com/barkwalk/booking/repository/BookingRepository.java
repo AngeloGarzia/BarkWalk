@@ -15,7 +15,12 @@ import jakarta.persistence.LockModeType;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     long countByWalkIdAndStatusIn(Long walkId, Collection<String> statuses);
-        List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
-        List<Booking> findByWalkId(Long walkId);
-        boolean existsByWalkIdAndDogIdAndStatusNotIn(Long walkId, Long dogId, Collection<String> statuses);
+
+    List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+    List<Booking> findByWalkId(Long walkId);
+
+    List<Booking> findByDogId(Long dogId);
+
+    boolean existsByWalkIdAndDogIdAndStatusNotIn(Long walkId, Long dogId, Collection<String> statuses);
 }
