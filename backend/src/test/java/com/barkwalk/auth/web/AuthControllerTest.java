@@ -27,6 +27,7 @@ class AuthControllerTest {
     @InjectMocks
     private AuthController authController;
 
+    // Délègue à AuthService pour tous les endpoints.
     @Test
     void delegatesToAuthService() {
         TokenResponse tokens = new TokenResponse("a", "r", "Bearer", 15, Set.of("USER"));

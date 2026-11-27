@@ -45,6 +45,7 @@ class MembershipServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Liste les plans actifs sans données Stripe.
     @Test
     void activePlans_omitsStripeFields() {
         MembershipPlan plan = new MembershipPlan();
@@ -52,6 +53,7 @@ class MembershipServiceTest {
         assertThat(membershipService.activePlans()).hasSize(1);
     }
 
+    // Retourne l'adhésion active de l'utilisateur.
     @Test
     void mine_returnsActiveMembership() {
         SecurityTestSupport.authenticate(3L, "m@example.com", Role.USER, Role.MEMBER);
@@ -65,6 +67,7 @@ class MembershipServiceTest {
         assertThat(membershipService.mine().orElseThrow().planId()).isEqualTo(1L);
     }
 
+    // Active l'adhésion et accorde le rôle membre.
     @Test
     void activateOnPayment_grantsMemberRole() {
         Membership membership = new Membership();
@@ -90,6 +93,7 @@ class MembershipServiceTest {
         verify(userRepository).save(user);
     }
 
+    // Rester idempotente si déjà active.
     @Test
     void activateOnPayment_isIdempotent() {
         Membership membership = new Membership();
@@ -99,6 +103,7 @@ class MembershipServiceTest {
         assertThat(membershipService.activateOnPayment(8L).getStatus()).isEqualTo("ACTIVE");
     }
 
+    // Refuse de démarrer checkout si adhésion déjà active.
     @Test
     void startCheckout_rejectsIfAlreadyActive() {
         SecurityTestSupport.authenticate(3L, "m@example.com", Role.USER);

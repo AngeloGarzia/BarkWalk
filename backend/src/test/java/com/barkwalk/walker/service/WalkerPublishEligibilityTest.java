@@ -14,12 +14,14 @@ class WalkerPublishEligibilityTest {
 
     private final WalkerPublishEligibility eligibility = new WalkerPublishEligibility();
 
+    // Autorise la publication d'un profil indépendant complet.
     @Test
     void assertCanPublish_allowsCompleteIndep() {
         WalkerProfile profile = completeIndep();
         assertThatCode(() -> eligibility.assertCanPublish(profile)).doesNotThrowAnyException();
     }
 
+    // Refuse si le SIRET manque.
     @Test
     void assertCanPublish_rejectsMissingSiret() {
         WalkerProfile profile = completeIndep();
@@ -31,6 +33,7 @@ class WalkerPublishEligibilityTest {
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    // Refuse si RC Pro expirée.
     @Test
     void assertCanPublish_rejectsExpiredRcPro() {
         WalkerProfile profile = completeIndep();
@@ -42,6 +45,7 @@ class WalkerPublishEligibilityTest {
                         .contains("RC Pro expired"));
     }
 
+    // Passe la vérification pour un marcheur staff.
     @Test
     void assertCanPublish_skipsStaff() {
         WalkerProfile profile = new WalkerProfile();

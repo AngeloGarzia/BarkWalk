@@ -110,6 +110,7 @@ class BookingServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Confirme une réservation gratuite sur une balade staff pour un membre.
     @Test
     void create_confirmsFreeStaffWalkForMember() {
         Walk walk = staffWalk(10L, 8);
@@ -135,6 +136,7 @@ class BookingServiceTest {
         assertThat(response.paymentRequired()).isFalse();
     }
 
+    // Refuse une réservation si le dossier chien est incomplet.
     @Test
     void create_rejectsUnvalidatedDog() {
         Walk walk = staffWalk(10L, 8);
@@ -152,6 +154,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Refuse une réservation si le dossier chien est expiré.
     @Test
     void create_rejectsExpiredDog() {
         Walk walk = staffWalk(10L, 8);
@@ -169,6 +172,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Refuse une réservation si le chien n'appartient pas à l'utilisateur.
     @Test
     void create_rejectsForeignDog() {
         Walk walk = staffWalk(10L, 8);
@@ -182,6 +186,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Marque une réservation comme annulée gratuitement si avant le délai.
     @Test
     void cancel_marksCancelledFreeWhenBeforeDeadline() {
         Booking booking = new Booking();
@@ -200,6 +205,7 @@ class BookingServiceTest {
         assertThat(booking.isCountsTowardMembershipQuota()).isFalse();
     }
 
+    // Marque une réservation comme annulée tardivement dans les 24 heures.
     @Test
     void cancel_marksCancelledLateWhenInside24h() {
         Booking booking = new Booking();
@@ -217,6 +223,7 @@ class BookingServiceTest {
         assertThat(booking.isCountsTowardOrgThreshold()).isTrue();
     }
 
+    // Annule par staff, rembourse et notifie l'utilisateur.
     @Test
     void cancelByStaff_refundsAndNotifies() {
         SecurityTestSupport.clear();
@@ -245,6 +252,7 @@ class BookingServiceTest {
         verify(notificationService).notifyWalkCancelledByStaff(10L, 1L, "weather");
     }
 
+    // Confirme le paiement et passe le statut à confirmé.
     @Test
     void confirmPayment_setsConfirmed() {
         Booking booking = new Booking();
@@ -259,6 +267,7 @@ class BookingServiceTest {
         verify(messagingService).addMemberToWalkThread(10L, 1L);
     }
 
+    // Rester idempotente si déjà confirmée.
     @Test
     void confirmPayment_isIdempotentWhenAlreadyConfirmed() {
         Booking booking = new Booking();
@@ -270,6 +279,7 @@ class BookingServiceTest {
         assertThat(booking.getConfirmedAt()).isEqualTo(java.time.Instant.parse("2026-01-01T10:00:00Z"));
     }
 
+    // Expire les paiements impayés et libère la place.
     @Test
     void expireUnpaidBookings_releasesPlace() {
         Booking booking = new Booking();
@@ -285,6 +295,7 @@ class BookingServiceTest {
         assertThat(booking.getCancellationReason()).isEqualTo("payment_expired");
     }
 
+    // Liste les réservations de l'utilisateur courant.
     @Test
     void mine_delegatesToRepository() {
         when(bookingRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
@@ -292,6 +303,7 @@ class BookingServiceTest {
         verify(bookingRepository).findByUserIdOrderByCreatedAtDesc(1L);
     }
 
+    // Exige la reconnaissance de la balade communautaire pour réserver.
     @Test
     void create_requiresCommunityAck() {
         Walk walk = staffWalk(10L, 8);
@@ -305,6 +317,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Passe le statut en attente de paiement pour une balade indépendante.
     @Test
     void create_pendingPaymentForIndep() {
         Walk walk = staffWalk(10L, 8);
@@ -332,6 +345,7 @@ class BookingServiceTest {
         assertThat(response.priceCents()).isEqualTo(2000);
     }
 
+    // Refuse de réserver une balade non publiée.
     @Test
     void create_rejectsUnpublishedWalk() {
         Walk walk = staffWalk(10L, 8);
@@ -343,6 +357,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Refuse si le chien n'est pas compatible avec la balade.
     @Test
     void create_rejectsIncompatibleDog() {
         Walk walk = staffWalk(10L, 8);
@@ -362,6 +377,7 @@ class BookingServiceTest {
                 });
     }
 
+    // Refuse les réservations dupliquées pour le même chien et la même balade.
     @Test
     void create_rejectsDuplicateBooking() {
         Walk walk = staffWalk(10L, 8);
@@ -375,6 +391,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
+    // Les non-membres paient pour les balades staff.
     @Test
     void create_nonMemberPaysForStaffWalk() {
         SecurityTestSupport.clear();
@@ -401,6 +418,7 @@ class BookingServiceTest {
         assertThat(response.priceCents()).isEqualTo(1500);
     }
 
+    // Exige une adhésion pour réserver une balade communautaire.
     @Test
     void create_communityRequiresMembership() {
         SecurityTestSupport.clear();
@@ -416,6 +434,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Interdit l'annulation par un autre utilisateur.
     @Test
     void cancel_forbiddenForOtherUser() {
         Booking booking = new Booking();
@@ -428,6 +447,7 @@ class BookingServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Refuse un second essai gratuit.
     @Test
     void create_rejectsSecondTrial() {
         Walk walk = staffWalk(10L, 8);
@@ -445,6 +465,7 @@ class BookingServiceTest {
                 });
     }
 
+    // Refuse l'essai gratuit sur une balade indépendante.
     @Test
     void create_rejectsTrialOnIndepWalk() {
         Walk walk = staffWalk(10L, 8);
@@ -463,6 +484,7 @@ class BookingServiceTest {
                 });
     }
 
+    // Place une réservation sur liste d'attente si la balade est pleine.
     @Test
     void create_fullWalkGoesToWaitlist() {
         Walk walk = staffWalk(10L, 1);

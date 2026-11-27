@@ -39,6 +39,7 @@ class CommunityOrgServiceTest {
     @InjectMocks
     private CommunityOrgService communityOrgService;
 
+    // Marque éligible au seuil de balades complétées.
     @Test
     void onWalkCompleted_marksEligibleAtThreshold() {
         Profile profile = new Profile();
@@ -58,6 +59,7 @@ class CommunityOrgServiceTest {
         assertThat(profile.getCommunityOrgStatus()).isEqualTo("ELIGIBLE");
     }
 
+    // Révoque l'accès si trop de signalements validés.
     @Test
     void evaluateRevocation_revokesOnValidatedReports() {
         Profile profile = new Profile();
@@ -76,6 +78,7 @@ class CommunityOrgServiceTest {
         verify(auditService).log(null, "ORG_REVOKED", "USER", 5L, "reports");
     }
 
+    // Révoque si notation trop basse.
     @Test
     void evaluateRevocation_revokesOnLowRating() {
         Profile profile = new Profile();

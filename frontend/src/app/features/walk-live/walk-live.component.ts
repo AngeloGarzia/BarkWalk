@@ -28,6 +28,7 @@ import {
   lineLengthMeters,
 } from '../../shared/route-editor/route-editor.component';
 import { AuthService } from '../../core/auth.service';
+import { basemapStyle } from '../../shared/map/basemap-style';
 import {
   PhotoItem,
   PhotoUploaderComponent,
@@ -715,22 +716,7 @@ export class WalkLiveComponent implements OnInit, OnDestroy {
     const center = this.resolveCenter();
     const map = new MapLibreMap({
       container: this.mapContainer.nativeElement,
-      style: {
-        version: 8,
-        sources: {
-          osmfr: {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap France',
-          },
-        },
-        layers: [{ id: 'osmfr', type: 'raster', source: 'osmfr' }],
-      },
+      style: basemapStyle(),
       center: [center.lng, center.lat],
       zoom: 14,
       minZoom: 4.2,

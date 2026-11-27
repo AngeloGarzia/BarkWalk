@@ -16,6 +16,7 @@ class SecurityUtilsTest {
         SecurityTestSupport.clear();
     }
 
+    // Retourne l'utilisateur courant authentifié.
     @Test
     void currentUser_whenAuthenticated() {
         SecurityTestSupport.authenticate(4L, "a@b.c", Role.USER);
@@ -23,6 +24,7 @@ class SecurityUtilsTest {
         assertThat(SecurityUtils.currentUser().getUsername()).isEqualTo("a@b.c");
     }
 
+    // Lève une erreur si utilisateur anonyme.
     @Test
     void currentUser_whenAnonymous() {
         assertThatThrownBy(SecurityUtils::currentUser)

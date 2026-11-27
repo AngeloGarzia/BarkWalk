@@ -24,7 +24,10 @@ import {
 } from 'maplibre-gl';
 import { AuthService } from '../../core/auth.service';
 import { bookingStatusLabel, walkTypeLabel } from '../../shared/labels';
+import { basemapStyle } from '../../shared/map/basemap-style';
 import { WalkDifficultyBarComponent } from '../../shared/walk-difficulty-bar/walk-difficulty-bar.component';
+import { WalkParticipantsComponent } from '../../shared/walk-participants/walk-participants.component';
+import { WalkRouteBadgeComponent } from '../../shared/walk-route-badge/walk-route-badge.component';
 
 export interface WalkPin {
   id: number;
@@ -51,6 +54,8 @@ export interface WalkPin {
   bookedCount: number;
   startsAt: string;
   status: string;
+  routeGeojson?: { type: string; coordinates: [number, number][] } | string | null;
+  participantDisplayNames?: string[] | null;
 }
 
 interface UserProfileLite {
@@ -78,22 +83,16 @@ interface HomeBooking {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink, DatePipe, WalkDifficultyBarComponent],
+  imports: [
+    RouterLink,
+    DatePipe,
+    WalkDifficultyBarComponent,
+    WalkRouteBadgeComponent,
+    WalkParticipantsComponent,
+  ],
   template: `
     <div class="home">
       <header class="top-row">
-        <a routerLink="/" class="brand" aria-label="Bark & Walk — accueil">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <circle cx="7.2" cy="8" r="1.5" fill="currentColor" />
-              <circle cx="16.8" cy="8" r="1.5" fill="currentColor" />
-              <circle cx="5" cy="12.2" r="1.35" fill="currentColor" />
-              <circle cx="19" cy="12.2" r="1.35" fill="currentColor" />
-              <ellipse cx="12" cy="15.4" rx="3" ry="2.4" fill="currentColor" />
-            </svg>
-          </span>
-          <span class="brand-wordmark">BARK &amp; WALK</span>
-        </a>
         @if (loggedIn()) {
           <button type="button" class="icon-btn" aria-label="Notifications">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -220,7 +219,10 @@ interface HomeBooking {
             <p class="next-when">{{ walk.startsAt | date: "EEEE d MMM · HH:mm" }}</p>
             <span class="bw-pill bw-pill-urgent">{{ daysUntilLabel(walk.startsAt) }}</span>
           </div>
-          <h2>{{ walk.title }}</h2>
+          <h2>
+            {{ walk.title }}
+            <app-walk-route-badge [routeGeojson]="walk.routeGeojson" />
+          </h2>
           <p class="next-place">
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
               <path
@@ -234,6 +236,7 @@ interface HomeBooking {
             {{ walk.meetingPointName || walk.meetingPointAddress || walk.cityName || 'Lieu à préciser' }}
           </p>
           <p class="next-extra">{{ formatDuration(walk.durationMinutes) }} · {{ seatsLeft(walk) }}</p>
+          <app-walk-participants [names]="walk.participantDisplayNames" />
         </a>
       }
 
@@ -278,7 +281,10 @@ interface HomeBooking {
                   @if (walk.promoPhotoUrls?.[0]; as thumb) {
                     <img class="walk-thumb" [src]="thumb" [alt]="walk.title" />
                   }
-                  <h3>{{ walk.title }}</h3>
+                  <h3>
+                    {{ walk.title }}
+                    <app-walk-route-badge [routeGeojson]="walk.routeGeojson" />
+                  </h3>
                   <p class="row-meta">
                     @if (walk.organizerDisplayName) {
                       {{ walk.organizerDisplayName }} ·
@@ -293,6 +299,7 @@ interface HomeBooking {
                     <span class="price-hint">{{ priceLabel(walk) }}</span>
                     <span class="seats" [class.tight]="remaining(walk) <= 3">{{ seatsLeft(walk) }}</span>
                   </div>
+                  <app-walk-participants [names]="walk.participantDisplayNames" />
                 </a>
               </li>
             }
@@ -315,36 +322,9 @@ interface HomeBooking {
       .top-row {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: 0.75rem;
         animation: rise 0.45s ease both;
-      }
-
-      .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        text-decoration: none;
-        color: var(--forest);
-      }
-
-      .brand-mark {
-        width: 1.55rem;
-        height: 1.55rem;
-        display: grid;
-        place-items: center;
-        color: var(--forest);
-      }
-
-      .brand-mark svg {
-        width: 100%;
-        height: 100%;
-      }
-
-      .brand-wordmark {
-        font-size: 1.05rem;
-        letter-spacing: 0.04em;
-        color: var(--forest);
       }
 
       .icon-btn {
@@ -489,6 +469,10 @@ interface HomeBooking {
         font-size: 1.35rem;
         line-height: 1.2;
         color: var(--on-forest);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex-wrap: wrap;
       }
 
       .next-place {
@@ -584,6 +568,10 @@ interface HomeBooking {
         font-size: 1.02rem;
         line-height: 1.25;
         color: var(--forest-deep);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
       }
 
       .row-meta {
@@ -882,22 +870,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const map = new MapLibreMap({
       container: this.mapContainer.nativeElement,
-      style: {
-        version: 8,
-        sources: {
-          osmfr: {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap France',
-          },
-        },
-        layers: [{ id: 'osmfr', type: 'raster', source: 'osmfr' }],
-      },
+      style: basemapStyle(),
       center: [2.5, 46.6],
       zoom: 5.1,
       minZoom: 4.2,

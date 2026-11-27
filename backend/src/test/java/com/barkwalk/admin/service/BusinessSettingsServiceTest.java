@@ -27,6 +27,7 @@ class BusinessSettingsServiceTest {
     @InjectMocks
     private BusinessSettingsService businessSettingsService;
 
+    // Utilise les valeurs par défaut si paramètres manquants.
     @Test
     void getInt_usesDefaultWhenMissing() {
         when(settingRepository.findById(any())).thenReturn(Optional.empty());
@@ -44,6 +45,7 @@ class BusinessSettingsServiceTest {
         assertThat(businessSettingsService.docReminderJ7Days()).isEqualTo(7);
     }
 
+    // Lit la valeur stockée en base de données.
     @Test
     void getInt_readsStoredValue() {
         Setting setting = new Setting();
@@ -54,6 +56,7 @@ class BusinessSettingsServiceTest {
         assertThat(businessSettingsService.pendingPaymentMinutes()).isEqualTo(20);
     }
 
+    // Persiste les paramètres connus en base.
     @Test
     void update_persistsKnownKey() {
         when(settingRepository.findById(BusinessSettingsKeys.REVIEW_WINDOW_DAYS)).thenReturn(Optional.empty());
@@ -65,6 +68,7 @@ class BusinessSettingsServiceTest {
         verify(settingRepository).save(any(Setting.class));
     }
 
+    // Refuse les paramètres inconnus.
     @Test
     void update_rejectsUnknownKey() {
         assertThatThrownBy(() -> businessSettingsService.update("not_a_real_setting", "1"))
@@ -75,6 +79,7 @@ class BusinessSettingsServiceTest {
                 });
     }
 
+    // Refuse les pourcentages de commission invalides.
     @Test
     void update_rejectsInvalidCommission() {
         assertThatThrownBy(
@@ -84,9 +89,10 @@ class BusinessSettingsServiceTest {
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    // Liste tous les paramètres métier disponibles.
     @Test
     void listBusinessSettings_returnsAllKeys() {
         when(settingRepository.findById(any())).thenReturn(Optional.empty());
-        assertThat(businessSettingsService.listBusinessSettings()).hasSize(12);
+        assertThat(businessSettingsService.listBusinessSettings()).hasSize(13);
     }
 }

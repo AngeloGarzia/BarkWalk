@@ -37,6 +37,7 @@ class BusinessJobsSchedulerTest {
     @InjectMocks
     private BusinessJobsScheduler scheduler;
 
+    // Délègue l'exécution des tâches fréquentes.
     @Test
     void runFrequentJobs_delegates() {
         when(bookingService.expireUnpaidBookings()).thenReturn(1);
@@ -46,6 +47,7 @@ class BusinessJobsSchedulerTest {
         verify(waitlistService).expireOffers();
     }
 
+    // Exécute les tâches quotidiennes et envoie les rappels.
     @Test
     void runDailyJobs_sendsReminders() {
         when(dogDossierService.expireOverdueDossiers()).thenReturn(0);

@@ -14,6 +14,8 @@ import {
   walkTypeLabel,
 } from '../../shared/labels';
 import { WalkDifficultyBarComponent } from '../../shared/walk-difficulty-bar/walk-difficulty-bar.component';
+import { WalkParticipantsComponent } from '../../shared/walk-participants/walk-participants.component';
+import { WalkRouteBadgeComponent } from '../../shared/walk-route-badge/walk-route-badge.component';
 import {
   PhotoItem,
   PhotoUploaderComponent,
@@ -41,6 +43,8 @@ interface WalkDetail {
   nonMemberPriceCents?: number | null;
   status: string;
   communityDisclaimerRequired?: boolean;
+  routeGeojson?: { type: string; coordinates: [number, number][] } | string | null;
+  participantDisplayNames?: string[] | null;
 }
 
 interface BookingRow {
@@ -118,6 +122,8 @@ interface WalkHistoryPayload {
     DatePipe,
     DecimalPipe,
     WalkDifficultyBarComponent,
+    WalkRouteBadgeComponent,
+    WalkParticipantsComponent,
     PhotoUploaderComponent,
   ],
   template: `
@@ -150,7 +156,10 @@ interface WalkHistoryPayload {
               @if (walk.promoPhotoUrls?.[0]; as thumb) {
                 <img class="promo-hero" [src]="thumb" [alt]="walk.title" />
               }
-              <h2>{{ walk.title }}</h2>
+              <h2>
+                {{ walk.title }}
+                <app-walk-route-badge [routeGeojson]="walk.routeGeojson" />
+              </h2>
               <p class="meta">
                 {{ walk.cityName || 'Ville' }}
                 @if (walk.meetingPointName) {
@@ -171,6 +180,7 @@ interface WalkHistoryPayload {
                 }
                 <span class="tag">{{ seatsLeft(walk) }}</span>
               </div>
+              <app-walk-participants [names]="walk.participantDisplayNames" />
               @if (walk.description) {
                 <p class="desc">{{ walk.description }}</p>
               }
@@ -586,6 +596,12 @@ interface WalkHistoryPayload {
         font-size: 1.05rem;
         font-family: var(--font-display);
         color: var(--forest-deep);
+      }
+      .walk-summary h2 {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
       }
       .walk-summary {
         margin-bottom: 1rem;

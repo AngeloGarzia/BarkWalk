@@ -32,6 +32,7 @@ class AnonymousAuthMockMvcTest {
     @Autowired
     private MockMvc mockMvc;
 
+    // Retourne 401 pour accès sans jeton à une route protégée.
     @Test
     void protectedRoute_withoutToken_returns401() throws Exception {
         mockMvc.perform(get("/api/me/profile"))

@@ -58,6 +58,7 @@ class WalkerServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Refuse une nouvelle candidature si déjà existante.
     @Test
     void apply_rejectsDuplicate() {
         when(walkerProfileRepository.findByUserId(1L)).thenReturn(Optional.of(new WalkerProfile()));
@@ -67,6 +68,7 @@ class WalkerServiceTest {
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
+    // Stocke les clés en serveur et les cache en réponse.
     @Test
     void apply_storesKeysServerSideAndHidesThem() {
         when(walkerProfileRepository.findByUserId(1L)).thenReturn(Optional.empty());
@@ -89,6 +91,7 @@ class WalkerServiceTest {
         assertThat(response.status()).isEqualTo("PENDING");
     }
 
+    // Liste les candidatures en attente sans données sensibles.
     @Test
     void pending_mapsWithoutSecrets() {
         WalkerProfile profile = new WalkerProfile();

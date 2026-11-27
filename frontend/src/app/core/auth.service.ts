@@ -134,6 +134,15 @@ export class AuthService {
     return this.hasRole('ADMIN');
   }
 
+  isCommunityOrg(): boolean {
+    return this.hasRole('COMMUNITY_ORG');
+  }
+
+  /** Agenda global : admin et organisateurs communautaires. */
+  canAccessCalendar(): boolean {
+    return this.isAdmin() || this.isCommunityOrg();
+  }
+
   login(payload: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>('/api/auth/login', payload).pipe(tap((res) => this.store(res)));
   }

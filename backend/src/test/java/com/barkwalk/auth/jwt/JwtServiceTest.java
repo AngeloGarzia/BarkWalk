@@ -20,6 +20,7 @@ class JwtServiceTest {
         jwtService = new JwtService(props);
     }
 
+    // Crée et analyse un jeton avec succès.
     @Test
     void createAndParse_roundTrip() {
         String token = jwtService.createAccessToken(9L, "a@b.c", Set.of(Role.USER, Role.MEMBER));

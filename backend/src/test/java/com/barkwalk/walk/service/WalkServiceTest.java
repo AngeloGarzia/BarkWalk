@@ -101,6 +101,7 @@ class WalkServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Délègue au repository pour lister les balades du catalogue.
     @Test
     void catalogue_delegates() {
         when(walkRepository.catalogue(1L, null, Instant.EPOCH)).thenReturn(List.of());
@@ -108,6 +109,7 @@ class WalkServiceTest {
         verify(walkRepository).catalogue(1L, null, Instant.EPOCH);
     }
 
+    // Retourne 404 si la balade n'existe pas.
     @Test
     void get_notFound() {
         when(walkRepository.findById(9L)).thenReturn(Optional.empty());
@@ -117,6 +119,7 @@ class WalkServiceTest {
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    // Exige le rôle staff pour créer une balade staff.
     @Test
     void create_staff_requiresStaffRole() {
         SecurityTestSupport.authenticate(1L, "user@example.com", Role.USER);
@@ -127,6 +130,7 @@ class WalkServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Crée une balade staff pour un marcheur accrédité.
     @Test
     void create_staff_okForWalker() {
         SecurityTestSupport.authenticate(2L, "staff@example.com", Role.USER, Role.WALKER_STAFF);
@@ -147,6 +151,7 @@ class WalkServiceTest {
         assertThat(response.organizerUserId()).isEqualTo(2L);
     }
 
+    // Interdit la création de balade communautaire si non éligible.
     @Test
     void create_community_forbiddenWhenNotEligible() {
         SecurityTestSupport.authenticate(4L, "member@example.com", Role.USER, Role.MEMBER);
@@ -162,6 +167,7 @@ class WalkServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Crée une balade communautaire si organisateur actif.
     @Test
     void create_community_okWhenActiveOrganizer() {
         SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
@@ -187,6 +193,7 @@ class WalkServiceTest {
         assertThat(response.minSociabilityDogs()).isEqualTo("GOOD");
     }
 
+    // Refuse une capacité supérieure au paramètre configuré.
     @Test
     void create_community_rejectsCapacityAboveSetting() {
         SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
@@ -235,6 +242,7 @@ class WalkServiceTest {
                 true);
     }
 
+    // Interdit la modification par un non-organisateur.
     @Test
     void update_forbiddenForNonOrganizer() {
         SecurityTestSupport.authenticate(9L, "other@example.com", Role.USER, Role.MEMBER);
@@ -268,6 +276,7 @@ class WalkServiceTest {
                         .isEqualTo(HttpStatus.FORBIDDEN));
     }
 
+    // Permet la modification par l'organisateur.
     @Test
     void update_okForOrganizer() {
         SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER, Role.COMMUNITY_ORG);
@@ -311,6 +320,7 @@ class WalkServiceTest {
         assertThat(response.difficultyLevel()).isBetween(1, 10);
     }
 
+    // Démarre la balade par l'organisateur.
     @Test
     void start_okForOrganizer() {
         SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER, Role.COMMUNITY_ORG);
@@ -333,6 +343,7 @@ class WalkServiceTest {
         assertThat(walk.getStatus()).isEqualTo("IN_PROGRESS");
     }
 
+    // Termine une balade en cours.
     @Test
     void complete_fromInProgress() {
         SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER, Role.COMMUNITY_ORG);
@@ -356,6 +367,7 @@ class WalkServiceTest {
         assertThat(response.archivedAt()).isNotNull();
     }
 
+    // Refuse un itinéraire réduit à un seul point.
     @Test
     void normalizeRouteGeojson_rejectsSinglePoint() {
         Map<String, Object> node = Map.of(
@@ -367,6 +379,7 @@ class WalkServiceTest {
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    // Accepte un itinéraire valide avec au moins deux points.
     @Test
     void normalizeRouteGeojson_acceptsValidLine() {
         Map<String, Object> node = Map.of(

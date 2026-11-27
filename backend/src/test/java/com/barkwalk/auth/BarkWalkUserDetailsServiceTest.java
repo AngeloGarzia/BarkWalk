@@ -25,6 +25,7 @@ class BarkWalkUserDetailsServiceTest {
     @InjectMocks
     private BarkWalkUserDetailsService service;
 
+    // Charge le principal utilisateur par email.
     @Test
     void loadsPrincipal() {
         User user = new User();
@@ -43,6 +44,7 @@ class BarkWalkUserDetailsServiceTest {
         assertThat(service.loadUserByUsername("u@example.com").getUsername()).isEqualTo("u@example.com");
     }
 
+    // Lève erreur si utilisateur inconnu.
     @Test
     void unknownUser() {
         when(userRepository.findByEmailIgnoreCase("x@y.z")).thenReturn(Optional.empty());

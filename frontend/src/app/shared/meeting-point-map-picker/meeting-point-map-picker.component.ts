@@ -20,6 +20,7 @@ import {
   Popup,
   setWorkerUrl,
 } from 'maplibre-gl';
+import { basemapStyle } from '../map/basemap-style';
 
 export interface MeetingPointPin {
   id: number;
@@ -128,22 +129,7 @@ export class MeetingPointMapPickerComponent implements AfterViewInit, OnChanges,
     const start = this.resolveCenter();
     const map = new MapLibreMap({
       container: this.mapContainer.nativeElement,
-      style: {
-        version: 8,
-        sources: {
-          osmfr: {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap France',
-          },
-        },
-        layers: [{ id: 'osmfr', type: 'raster', source: 'osmfr' }],
-      },
+      style: basemapStyle(),
       center: [start.lng, start.lat],
       zoom: 12.5,
       minZoom: 4.2,

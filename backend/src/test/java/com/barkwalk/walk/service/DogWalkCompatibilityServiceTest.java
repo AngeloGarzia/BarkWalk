@@ -13,6 +13,7 @@ class DogWalkCompatibilityServiceTest {
 
     private final DogWalkCompatibilityService service = new DogWalkCompatibilityService();
 
+    // Évalue compatible quand tous les critères correspondent.
     @Test
     void evaluate_compatibleWhenAllCriteriaMatch() {
         Walk walk = walk(new String[] {"LARGE"}, new String[] {"HIGH"}, "AVERAGE");
@@ -22,6 +23,7 @@ class DogWalkCompatibilityServiceTest {
         assertThat(result.reason()).isNull();
     }
 
+    // Refuse si taille incompatible avec raison précise.
     @Test
     void evaluate_rejectsSizeWithPreciseReason() {
         Walk walk = walk(new String[] {"SMALL"}, new String[] {"HIGH"}, null);
@@ -31,6 +33,7 @@ class DogWalkCompatibilityServiceTest {
         assertThat(result.reason()).contains("Size");
     }
 
+    // Refuse si énergie incompatible avec raison précise.
     @Test
     void evaluate_rejectsEnergyWithPreciseReason() {
         Walk walk = walk(new String[] {"LARGE"}, new String[] {"LOW"}, null);
@@ -40,6 +43,7 @@ class DogWalkCompatibilityServiceTest {
         assertThat(result.reason()).contains("Energy");
     }
 
+    // Refuse si sociabilité incompatible avec raison précise.
     @Test
     void evaluate_rejectsSociabilityWithPreciseReason() {
         Walk walk = walk(new String[] {"LARGE"}, new String[] {"HIGH"}, "GOOD");
@@ -49,6 +53,7 @@ class DogWalkCompatibilityServiceTest {
         assertThat(result.reason()).contains("Sociability");
     }
 
+    // Lance une erreur 400 si incompatibilité détectée.
     @Test
     void assertCompatible_throwsBadRequest() {
         Walk walk = walk(new String[] {"SMALL"}, new String[] {"HIGH"}, null);
@@ -59,6 +64,7 @@ class DogWalkCompatibilityServiceTest {
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    // Refuse catégorie 1 sur une balade normale.
     @Test
     void evaluate_rejectsCategory1OnNormalWalk() {
         Walk walk = walk(new String[] {"LARGE"}, new String[] {"HIGH"}, null);
@@ -69,6 +75,7 @@ class DogWalkCompatibilityServiceTest {
         assertThat(result.reason()).contains("dedicated");
     }
 
+    // Accepte catégorie 2 sur une balade dédiée.
     @Test
     void evaluate_allowsCategory2OnDedicatedWalk() {
         Walk walk = walk(new String[] {"LARGE"}, new String[] {"HIGH"}, null);

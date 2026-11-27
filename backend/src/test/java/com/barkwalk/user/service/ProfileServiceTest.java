@@ -68,6 +68,7 @@ class ProfileServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Stocke une photo et retourne une URL signée.
     @Test
     void uploadPhoto_storesAndReturnsSignedUrl() {
         Profile profile = profile(1L);
@@ -97,6 +98,7 @@ class ProfileServiceTest {
         assertThat(profile.getPhotoKey()).isEqualTo("profiles/1/a.jpg");
     }
 
+    // Refuse une quatrième photo.
     @Test
     void uploadPhoto_rejectsFourthPhoto() {
         when(profileRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(profile(1L)));
@@ -110,6 +112,7 @@ class ProfileServiceTest {
         verify(storageService, never()).storeImage(anyString(), any());
     }
 
+    // Passe en attente si modification d'un champ sensible.
     @Test
     void update_validatedSensitiveField_setsPending() {
         Profile profile = profile(1L);
@@ -133,6 +136,7 @@ class ProfileServiceTest {
                 .log(eq(1L), eq("PROFILE_SENSITIVE_EDIT"), eq("PROFILE"), eq(1L), anyString());
     }
 
+    // Reste validée si seule modification de la bio.
     @Test
     void update_validatedBioOnly_keepsValidated() {
         Profile profile = profile(1L);
@@ -155,6 +159,7 @@ class ProfileServiceTest {
         assertThat(response.bio()).isEqualTo("Nouvelle bio");
     }
 
+    // Supprime une photo, réindexe et met à jour la clé.
     @Test
     void deletePhoto_reindexesAndSyncsLegacyKey() {
         Profile profile = profile(1L);

@@ -19,6 +19,7 @@ class CommissionCalculatorTest {
     @InjectMocks
     private CommissionCalculator calculator;
 
+    // Calcule la commission selon le pourcentage configuré.
     @Test
     void commissionCents_usesConfiguredPercent() {
         when(businessSettingsService.indepCommissionPercent()).thenReturn(15);
@@ -26,6 +27,7 @@ class CommissionCalculatorTest {
         assertThat(calculator.walkerNetCents(2000)).isEqualTo(1700);
     }
 
+    // La commission est zéro si le montant est zéro.
     @Test
     void commissionCents_zeroWhenAmountZero() {
         assertThat(calculator.commissionCents(0)).isEqualTo(0);

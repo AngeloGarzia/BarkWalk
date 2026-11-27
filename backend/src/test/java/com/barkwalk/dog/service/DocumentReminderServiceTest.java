@@ -36,6 +36,7 @@ class DocumentReminderServiceTest {
     @InjectMocks
     private DocumentReminderService documentReminderService;
 
+    // Marque la notification J+30 comme envoyée.
     @Test
     void sendDueReminders_marksJ30Sent() {
         when(businessSettingsService.docReminderJ30Days()).thenReturn(30);

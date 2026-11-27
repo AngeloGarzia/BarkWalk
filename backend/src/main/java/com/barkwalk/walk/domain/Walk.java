@@ -109,6 +109,10 @@ public class Walk {
     @Column(name = "archived_at")
     private Instant archivedAt;
 
+    /** Pointage des présents validé par orga / encadrant / admin. */
+    @Column(name = "attendance_validated_at")
+    private Instant attendanceValidatedAt;
+
     /** Balade passée dont celle-ci est un recyclage. */
     @Column(name = "recycled_from_walk_id")
     private Long recycledFromWalkId;
@@ -345,6 +349,14 @@ public class Walk {
 
     public void setArchivedAt(Instant archivedAt) {
         this.archivedAt = archivedAt;
+    }
+
+    public Instant getAttendanceValidatedAt() {
+        return attendanceValidatedAt;
+    }
+
+    public void setAttendanceValidatedAt(Instant attendanceValidatedAt) {
+        this.attendanceValidatedAt = attendanceValidatedAt;
     }
 
     public Long getRecycledFromWalkId() {

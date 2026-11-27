@@ -20,6 +20,7 @@ import {
   Popup,
   setWorkerUrl,
 } from 'maplibre-gl';
+import { basemapStyle } from '../map/basemap-style';
 
 export interface WalkMapPin {
   id: number;
@@ -116,22 +117,7 @@ export class WalksMapComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     const map = new MapLibreMap({
       container: this.mapContainer.nativeElement,
-      style: {
-        version: 8,
-        sources: {
-          osmfr: {
-            type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution: '© OpenStreetMap France',
-          },
-        },
-        layers: [{ id: 'osmfr', type: 'raster', source: 'osmfr' }],
-      },
+      style: basemapStyle(),
       center: [2.5, 46.6],
       zoom: 5.1,
       minZoom: 4.2,

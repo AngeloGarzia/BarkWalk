@@ -33,6 +33,7 @@ class WalkTomorrowReminderServiceTest {
     @InjectMocks
     private WalkTomorrowReminderService service;
 
+    // Notifie une seule fois les utilisateurs confirmés.
     @Test
     void sendTomorrowReminders_notifiesConfirmedUsersOnce() {
         Walk walk = new Walk();
@@ -50,6 +51,7 @@ class WalkTomorrowReminderServiceTest {
         verify(notificationService, never()).notifyWalkTomorrow(eq(7L), eq(12L), any());
     }
 
+    // Retourne zéro si aucune balade prévue demain.
     @Test
     void sendTomorrowReminders_returnsZeroWhenNoWalks() {
         when(walkRepository.findPublishedBetween(any(Instant.class), any(Instant.class))).thenReturn(List.of());

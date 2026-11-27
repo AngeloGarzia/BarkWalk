@@ -60,6 +60,7 @@ class WalkParticipantsPrivacyTest {
         SecurityTestSupport.clear();
     }
 
+    // Interdit l'accès aux participants pour un simple membre.
     @Test
     void participants_forbiddenForSimpleMember() {
         SecurityTestSupport.authenticate(10L, "member@example.com", Role.USER, Role.MEMBER);
@@ -75,6 +76,7 @@ class WalkParticipantsPrivacyTest {
                         .isEqualTo(HttpStatus.FORBIDDEN));
     }
 
+    // Autorise l'accès pour le marcheur assigné et inclut téléphones.
     @Test
     void participants_okForAssignedWalker_includesPhone() {
         SecurityTestSupport.authenticate(5L, "walker@example.com", Role.USER, Role.WALKER_STAFF);

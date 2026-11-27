@@ -11,6 +11,7 @@ import com.barkwalk.city.repository.CityRepository;
 import com.barkwalk.common.PrivacyService;
 import com.barkwalk.common.Role;
 import com.barkwalk.dog.repository.DogRepository;
+import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.review.repository.WalkRatingRepository;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.user.repository.ProfileRepository;
@@ -66,6 +67,8 @@ class WalkRecycleServiceTest {
     private WalkRatingRepository walkRatingRepository;
     @Mock
     private WalkPhotoService walkPhotoService;
+    @Mock
+    private MessagingService messagingService;
     @Spy
     private WalkDifficultyCalculator difficultyCalculator = new WalkDifficultyCalculator();
 
@@ -86,6 +89,10 @@ class WalkRecycleServiceTest {
         org.mockito.Mockito.lenient()
                 .when(bookingRepository.countByWalkIdAndStatusIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(0L);
+        org.mockito.Mockito.lenient()
+                .doNothing()
+                .when(messagingService)
+                .ensureWalkThread(org.mockito.ArgumentMatchers.any());
     }
 
     @AfterEach
@@ -93,6 +100,7 @@ class WalkRecycleServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Recycle copie les attributs et relie à la source.
     @Test
     void recycle_copiesAttributesAndLinksSource() {
         SecurityTestSupport.authenticate(7L, "org@barkwalk.fr", Role.USER, Role.COMMUNITY_ORG);
@@ -117,6 +125,7 @@ class WalkRecycleServiceTest {
         assertThat(response.difficultyLevel()).isEqualTo(4);
     }
 
+    // Refuse de recycler une source future encore publiée.
     @Test
     void recycle_rejectsFutureSourceStillPublished() {
         SecurityTestSupport.authenticate(7L, "org@barkwalk.fr", Role.USER, Role.COMMUNITY_ORG);

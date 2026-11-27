@@ -46,6 +46,7 @@ class JwtAuthFilterTest {
         SecurityContextHolder.clearContext();
     }
 
+    // Extrait et valide l'authentification du jeton Bearer.
     @Test
     void setsAuthenticationFromBearer() throws Exception {
         String token = jwtService.createAccessToken(1L, "a@b.c", Set.of(Role.USER));
@@ -71,6 +72,7 @@ class JwtAuthFilterTest {
         verify(filterChain).doFilter(any(), any());
     }
 
+    // Passe si l'en-tête Authorization manque.
     @Test
     void ignoresMissingHeader() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();

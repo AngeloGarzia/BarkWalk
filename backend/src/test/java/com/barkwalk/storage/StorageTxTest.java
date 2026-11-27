@@ -18,6 +18,7 @@ class StorageTxTest {
         }
     }
 
+    // Supprime le fichier uniquement si la transaction est annulée.
     @Test
     void deleteOnRollback_deletesOnlyWhenRolledBack() {
         TransactionSynchronizationManager.initSynchronization();
@@ -36,6 +37,7 @@ class StorageTxTest {
         verify(storage).deleteObject("profiles/1/a.jpg");
     }
 
+    // Supprime le fichier lors du commit.
     @Test
     void deleteAfterCommit_deletesOnCommit() {
         TransactionSynchronizationManager.initSynchronization();

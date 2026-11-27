@@ -84,6 +84,7 @@ class WaitlistServiceTest {
                 });
     }
 
+    // Propose la place au premier en attente.
     @Test
     void offerNext_offersFirstWaiting() {
         Walk walk = new Walk();
@@ -112,6 +113,7 @@ class WaitlistServiceTest {
         verify(notificationService).notifyWaitlistOffer(10L, 3L, 5L);
     }
 
+    // Expire les offres et propose au suivant.
     @Test
     void expireOffers_cascadesToNext() {
         WaitlistEntry expired = new WaitlistEntry();
@@ -137,6 +139,7 @@ class WaitlistServiceTest {
         assertThat(expired.getStatus()).isEqualTo("EXPIRED");
     }
 
+    // Accepte l'offre et crée une réservation confirmée.
     @Test
     void acceptOffer_createsConfirmedBooking() {
         SecurityTestSupport.authenticate(3L, "u@example.com", Role.USER, Role.MEMBER);
@@ -167,6 +170,7 @@ class WaitlistServiceTest {
         assertThat(entry.getStatus()).isEqualTo("ACCEPTED");
     }
 
+    // Ne fait rien si balade pleine ou offre déjà existante.
     @Test
     void offerNext_noopWhenFullOrAlreadyOffered() {
         Walk walk = new Walk();
@@ -186,6 +190,7 @@ class WaitlistServiceTest {
         waitlistService.offerNext(10L);
     }
 
+    // Expire les offres périmées avant de proposer la suivante.
     @Test
     void offerNext_expiresStaleOfferBeforeSelectingNext() {
         Walk walk = new Walk();
@@ -221,6 +226,7 @@ class WaitlistServiceTest {
         assertThat(waiting.getStatus()).isEqualTo("OFFERED");
     }
 
+    // Interdit l'acceptation par un autre utilisateur.
     @Test
     void acceptOffer_forbiddenForOtherUser() {
         SecurityTestSupport.authenticate(99L, "other@example.com", Role.USER);
@@ -235,6 +241,7 @@ class WaitlistServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Refuse d'accepter une offre expirée.
     @Test
     void acceptOffer_rejectsExpired() {
         SecurityTestSupport.authenticate(3L, "u@example.com", Role.USER);

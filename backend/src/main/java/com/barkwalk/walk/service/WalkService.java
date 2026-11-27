@@ -376,6 +376,19 @@ public class WalkService {
         return walkRepository.findAdminOverview(cityId, normalized).stream().map(this::toResponse).toList();
     }
 
+    /**
+     * Agenda admin / organisateur : toutes les balades (passées et à venir), sans filtre statut.
+     */
+    @Transactional(readOnly = true)
+    public List<WalkResponse> calendarOverview() {
+        var roles = SecurityUtils.currentUser().getRoles();
+        boolean allowed = roles.contains(Role.ADMIN) || roles.contains(Role.COMMUNITY_ORG);
+        if (!allowed) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Calendar reserved to admin and organizers");
+        }
+        return walkRepository.findAdminOverview(null, null).stream().map(this::toResponse).toList();
+    }
+
     private static String normalizeAdminStatusFilter(String status) {
         if (status == null || status.isBlank()) {
             return null;
@@ -529,6 +542,44 @@ public class WalkService {
         return new ParticipantsResponse(walkId, rows);
     }
 
+    /** Pseudos visibles sur les tuiles : admin / organisateur / encadrant assigné uniquement. */
+    private List<String> participantDisplayNamesIfAllowed(Walk walk) {
+        Long viewerId = SecurityUtils.currentUserIdOrNull();
+        if (viewerId == null || !canListParticipants(walk, viewerId)) {
+            return null;
+        }
+        if (walk.getId() == null) {
+            return List.of();
+        }
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (Booking booking : bookingRepository.findByWalkId(walk.getId())) {
+            if (!List.of("CONFIRMED", "PENDING_PAYMENT", "COMPLETED").contains(booking.getStatus())) {
+                continue;
+            }
+            String name = privacyService.displayName(booking.getUserId());
+            if (name != null && !name.isBlank()) {
+                names.add(name);
+            }
+        }
+        return List.copyOf(names);
+    }
+
+    private boolean canListParticipants(Walk walk, Long viewerId) {
+        var principal = SecurityUtils.currentUser();
+        if (principal.getRoles().contains(Role.ADMIN)) {
+            return true;
+        }
+        if (walk.getOrganizerUserId() != null && walk.getOrganizerUserId().equals(viewerId)) {
+            return true;
+        }
+        if (walk.getWalkerId() != null) {
+            return walkerProfileRepository.findByUserId(viewerId)
+                    .map(wp -> walk.getWalkerId().equals(wp.getId()))
+                    .orElse(false);
+        }
+        return false;
+    }
+
     private void assertCapacityAllowed(String walkType, int capacity) {
         if ("COMMUNITY".equals(walkType)) {
             int max = businessSettingsService.communityCapacityMax();
@@ -586,22 +637,9 @@ public class WalkService {
     }
 
     private void requireStaffForWalk(Walk walk, Long viewerId) {
-        var principal = SecurityUtils.currentUser();
-        if (principal.getRoles().contains(Role.ADMIN)) {
-            return;
+        if (!canListParticipants(walk, viewerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only walk staff can list participants");
         }
-        if (walk.getOrganizerUserId() != null && walk.getOrganizerUserId().equals(viewerId)) {
-            return;
-        }
-        if (walk.getWalkerId() != null) {
-            boolean isAssignedWalker = walkerProfileRepository.findByUserId(viewerId)
-                    .map(wp -> walk.getWalkerId().equals(wp.getId()))
-                    .orElse(false);
-            if (isAssignedWalker) {
-                return;
-            }
-        }
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only walk staff can list participants");
     }
 
     private WalkResponse toResponse(Walk walk) {
@@ -639,6 +677,7 @@ public class WalkService {
                 walk.getStartedAt(),
                 walk.getCompletedAt(),
                 walk.getArchivedAt(),
+                walk.getAttendanceValidatedAt(),
                 walk.getRecycledFromWalkId(),
                 walk.getId() == null ? List.of() : walkPhotoService.promoUrls(walk.getId(), 3),
                 walk.getId() == null ? 0 : (int) walkPhotoService.galleryCount(walk.getId()),
@@ -648,7 +687,8 @@ public class WalkService {
                 walk.isAllowsDangerCategories(),
                 walk.getRouteHint(),
                 walk.getRouteGeojson(),
-                walk.isCommunityDisclaimerRequired());
+                walk.isCommunityDisclaimerRequired(),
+                participantDisplayNamesIfAllowed(walk));
     }
 
     private String organizerDisplayName(Walk walk) {

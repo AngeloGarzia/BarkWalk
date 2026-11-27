@@ -48,6 +48,7 @@ class WalkPhotoServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Refuse l'upload de galerie avant le démarrage.
     @Test
     void upload_gallery_rejectsBeforeStart() {
         SecurityTestSupport.authenticate(7L, "org@barkwalk.fr", Role.USER, Role.COMMUNITY_ORG);
@@ -65,6 +66,7 @@ class WalkPhotoServiceTest {
                 .satisfies(ex -> assertThatStatus((ResponseStatusException) ex, HttpStatus.BAD_REQUEST));
     }
 
+    // Refuse l'upload promo par un non-créateur.
     @Test
     void upload_promo_rejectsNonCreator() {
         SecurityTestSupport.authenticate(5L, "user@barkwalk.fr", Role.USER);

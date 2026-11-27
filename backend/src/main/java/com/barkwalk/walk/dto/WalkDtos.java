@@ -42,6 +42,7 @@ public final class WalkDtos {
             Instant startedAt,
             Instant completedAt,
             Instant archivedAt,
+            Instant attendanceValidatedAt,
             Long recycledFromWalkId,
             List<String> promoPhotoUrls,
             int galleryCount,
@@ -51,7 +52,9 @@ public final class WalkDtos {
             boolean allowsDangerCategories,
             String routeHint,
             Map<String, Object> routeGeojson,
-            boolean communityDisclaimerRequired) {}
+            boolean communityDisclaimerRequired,
+            /** Pseudos / noms visibles uniquement pour admin, organisateur ou encadrant assigné ; sinon null. */
+            List<String> participantDisplayNames) {}
 
     public record WalkRecycleRequest(@NotNull Instant startsAt) {}
     public record WalkCreateRequest(

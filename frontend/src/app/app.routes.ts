@@ -2,6 +2,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
 import { adminGuard } from './core/admin.guard';
+import { calendarGuard } from './core/calendar.guard';
 
 export const routes: Routes = [
   {
@@ -39,6 +40,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/walk-live/walk-live.component').then(m => m.WalkLiveComponent),
     canActivate: [authGuard],
+  },
+  {
+    path: 'calendar',
+    loadComponent: () =>
+      import('./features/calendar/calendar.component').then(m => m.CalendarComponent),
+    canActivate: [authGuard, calendarGuard],
   },
   {
     path: 'admin',

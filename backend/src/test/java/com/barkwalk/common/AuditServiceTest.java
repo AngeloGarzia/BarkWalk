@@ -19,6 +19,7 @@ class AuditServiceTest {
     @InjectMocks
     private AuditService auditService;
 
+    // Persiste une entrée d'audit en base.
     @Test
     void log_persistsEntry() {
         when(repository.save(any(AuditLog.class))).thenAnswer(inv -> inv.getArgument(0));

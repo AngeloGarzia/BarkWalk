@@ -55,6 +55,7 @@ class WalkRatingServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Refuse l'évaluation avant le lendemain.
     @Test
     void rate_rejectsBeforeNextDay() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
@@ -71,6 +72,7 @@ class WalkRatingServiceTest {
                 });
     }
 
+    // Accepte l'évaluation le lendemain de la balade.
     @Test
     void rate_okTheDayAfter() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
@@ -99,6 +101,7 @@ class WalkRatingServiceTest {
         assertThat(creator.getRatingsCount()).isEqualTo(1);
     }
 
+    // Refuse l'évaluation par un non-participant.
     @Test
     void rate_rejectsNonParticipant() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);

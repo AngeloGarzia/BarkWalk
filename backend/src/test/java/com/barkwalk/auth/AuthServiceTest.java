@@ -59,6 +59,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
+    // Refuse l'enregistrement sans acceptation des CGU.
     @Test
     void register_rejectsWhenCguNotAccepted() {
         var req = new RegisterRequest("Ada@Example.com", "Secret1!", "Ada", "Lovelace", 1L, false);
@@ -68,6 +69,7 @@ class AuthServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Normalise l'email et crée le profil utilisateur.
     @Test
     void register_normalizesEmailAndCreatesProfile() {
         stubTokenIssue();
@@ -97,6 +99,7 @@ class AuthServiceTest {
         verify(profileRepository).save(any(Profile.class));
     }
 
+    // Refuse si l'email existe déjà.
     @Test
     void register_conflictWhenEmailExists() {
         when(userRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(true);
@@ -108,6 +111,7 @@ class AuthServiceTest {
         verify(userRepository, never()).save(any());
     }
 
+    // Retourne les jetons après authentification.
     @Test
     void login_returnsTokens() {
         stubTokenIssue();
@@ -119,6 +123,7 @@ class AuthServiceTest {
         verify(authenticationManager).authenticate(any());
     }
 
+    // Refuse de rafraîchir un jeton expiré.
     @Test
     void refresh_rejectsExpiredToken() {
         RefreshToken stored = new RefreshToken();
@@ -133,6 +138,7 @@ class AuthServiceTest {
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    // Renouvelle et fait pivoter un jeton valide.
     @Test
     void refresh_rotatesValidToken() {
         stubTokenIssue();
@@ -147,6 +153,7 @@ class AuthServiceTest {
         assertThat(tokens.accessToken()).isEqualTo("access.jwt");
     }
 
+    // Révoque le jeton lors de la déconnexion.
     @Test
     void logout_revokesWhenPresent() {
         RefreshToken stored = new RefreshToken();
@@ -155,6 +162,7 @@ class AuthServiceTest {
         assertThat(stored.isRevoked()).isTrue();
     }
 
+    // Ne lève pas d'erreur pour email inconnu (sécurité).
     @Test
     void magicLink_doesNotThrowWhenUnknownEmail() {
         when(userRepository.findByEmailIgnoreCase("ghost@example.com")).thenReturn(Optional.empty());

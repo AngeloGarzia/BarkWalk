@@ -11,18 +11,21 @@ class WalkDifficultyCalculatorTest {
 
     private final WalkDifficultyCalculator calculator = new WalkDifficultyCalculator();
 
+    // Calcule difficulté basse pour une balade plate et courte.
     @Test
     void compute_easyFlatShortWalk_isLow() {
         int level = calculator.compute(30, 10, "FLAT");
         assertThat(level).isBetween(1, 3);
     }
 
+    // Calcule difficulté haute pour une longue balade en montagne.
     @Test
     void compute_longMountainWalk_isHigh() {
         int level = calculator.compute(130, 450, "MOUNTAIN");
         assertThat(level).isBetween(8, 10);
     }
 
+    // Refuse un type de terrain inconnu.
     @Test
     void normalizeTerrain_rejectsUnknown() {
         assertThatThrownBy(() -> calculator.normalizeTerrain("SWAMP"))

@@ -74,7 +74,8 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/walks/mine",
                                 "/api/walks/archived",
-                                "/api/walks/admin-overview")
+                                "/api/walks/admin-overview",
+                                "/api/walks/calendar")
                         .authenticated()
                         .requestMatchers(
                                 HttpMethod.GET,

@@ -102,4 +102,26 @@ public interface WalkRepository extends JpaRepository<Walk, Long> {
         ORDER BY w.startsAt DESC
         """)
     List<Walk> findMine(@Param("userId") Long userId, @Param("walkerId") Long walkerId);
+
+    @Query("""
+        SELECT w FROM Walk w
+        WHERE w.attendanceValidatedAt IS NULL
+          AND w.status <> 'CANCELLED'
+          AND w.archivedAt IS NULL
+          AND (
+            w.organizerUserId = :userId
+            OR (:walkerId IS NOT NULL AND w.walkerId = :walkerId)
+          )
+        ORDER BY w.startsAt ASC
+        """)
+    List<Walk> findMinePendingAttendance(@Param("userId") Long userId, @Param("walkerId") Long walkerId);
+
+    @Query("""
+        SELECT w FROM Walk w
+        WHERE w.attendanceValidatedAt IS NULL
+          AND w.status <> 'CANCELLED'
+          AND w.archivedAt IS NULL
+        ORDER BY w.startsAt ASC
+        """)
+    List<Walk> findPendingAttendanceCandidates();
 }

@@ -26,6 +26,7 @@ class StorageServiceTest {
                 "barkwalk-docs", 15, tempDir.toString(), "test-signing-secret");
     }
 
+    // Détecte JPEG même avec mauvais type MIME.
     @Test
     void storeImage_detectsJpegDespiteWrongContentType() {
         byte[] jpeg = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01, 0x02, 0x03};
@@ -38,6 +39,7 @@ class StorageServiceTest {
         assertThat(tempDir.resolve(stored.storageKey())).exists();
     }
 
+    // Détecte PNG et WebP selon la signature du fichier.
     @Test
     void storeImage_detectsPngAndWebp() {
         byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
@@ -53,6 +55,7 @@ class StorageServiceTest {
         assertThat(webpStored.contentType()).isEqualTo("image/webp");
     }
 
+    // Refuse les fichiers avec signature d'image inconnue.
     @Test
     void storeImage_rejectsUnknownMagic() {
         byte[] junk = "not-an-image".getBytes(StandardCharsets.UTF_8);
@@ -63,6 +66,7 @@ class StorageServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Refuse les images trop volumineuses.
     @Test
     void storeImage_rejectsOversize() {
         byte[] huge = new byte[5 * 1024 * 1024 + 1];
@@ -76,6 +80,7 @@ class StorageServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Refuse les tentatives de traversée de répertoires.
     @Test
     void resolveSafe_rejectsPathTraversal() {
         assertThatThrownBy(() -> storageService.loadAsResource("../secret.txt"))
@@ -84,6 +89,7 @@ class StorageServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Génère une URL média stable et valide dans la fenêtre.
     @Test
     void publicMediaUrl_isStableAndValidWithinWindow() {
         String url1 = storageService.publicMediaUrl("profiles/1/photo.jpg");
@@ -96,6 +102,7 @@ class StorageServiceTest {
         storageService.assertValidMediaSignature("profiles/1/photo.jpg", exp, sig);
     }
 
+    // Rejette une signature media expirée.
     @Test
     void publicMediaUrl_rejectsExpiredSignature() {
         long exp = Instant.now().getEpochSecond() - 30;

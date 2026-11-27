@@ -72,6 +72,7 @@ class PaymentServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Exige la signature du webhook quand secret configuré.
     @Test
     void webhook_requiresSignatureWhenSecretConfigured() {
         PaymentService secured = new PaymentService(
@@ -89,6 +90,7 @@ class PaymentServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Ignore les événements dupliqués.
     @Test
     void webhook_duplicateEvent() {
         when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_1")).thenReturn(true);
@@ -97,6 +99,7 @@ class PaymentServiceTest {
         verify(bookingService, never()).confirmPayment(any());
     }
 
+    // Confirme la réservation et enregistre la commission indépendante.
     @Test
     void webhook_confirmsBookingAndRecordsIndepCommission() {
         when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_2")).thenReturn(false);
@@ -130,6 +133,7 @@ class PaymentServiceTest {
         assertThat(captor.getValue().getAmountCents()).isEqualTo(2000);
     }
 
+    // Liste les paiements de l'utilisateur sans données sensibles.
     @Test
     void mine_listsSanitizedPayments() {
         SecurityTestSupport.authenticate(9L, "u@example.com", Role.USER);
@@ -146,6 +150,7 @@ class PaymentServiceTest {
         assertThat(responses.getFirst().amountCents()).isEqualTo(1000);
     }
 
+    // Active l'adhésion et enregistre le paiement via webhook.
     @Test
     void webhook_activatesMembershipAndRecordsPayment() {
         when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_m")).thenReturn(false);
@@ -172,6 +177,7 @@ class PaymentServiceTest {
         assertThat(captor.getValue().getMembershipId()).isEqualTo(5L);
     }
 
+    // Ignore un paiement de réservation déjà enregistré.
     @Test
     void webhook_skipsExistingBookingPayment() {
         when(webhookEventRepository.existsByProviderAndEventId("stripe", "evt_3")).thenReturn(false);
@@ -193,6 +199,7 @@ class PaymentServiceTest {
         verify(paymentRepository, never()).save(any(Payment.class));
     }
 
+    // Liste tous les paiements pour l'admin.
     @Test
     void allForAdmin_mapsPayments() {
         Payment payment = new Payment();

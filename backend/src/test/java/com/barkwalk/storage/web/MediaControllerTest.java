@@ -31,6 +31,7 @@ class MediaControllerTest {
         mockMvc = MockMvcBuilders.standaloneSetup(new MediaController(storageService)).build();
     }
 
+    // Retourne l'image avec signature valide.
     @Test
     void validSignature_returnsImage() throws Exception {
         byte[] jpeg = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x11, 0x22};
@@ -48,6 +49,7 @@ class MediaControllerTest {
                 .andExpect(header().string("Cache-Control", "private, max-age=86400"));
     }
 
+    // Retourne 403 avec signature invalide.
     @Test
     void invalidSignature_returns403() throws Exception {
         byte[] jpeg = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x11};
@@ -61,6 +63,7 @@ class MediaControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    // Retourne 403 avec signature expirée.
     @Test
     void expiredSignature_returns403() throws Exception {
         byte[] jpeg = new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x33};

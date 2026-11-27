@@ -72,6 +72,7 @@ class MessagingServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Refuse de poster si l'auteur est bloqué.
     @Test
     void post_rejectsWhenBlocked() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER);
@@ -91,6 +92,7 @@ class MessagingServiceTest {
                 .satisfies(ex -> assertThatStatus(ex, HttpStatus.FORBIDDEN));
     }
 
+    // Refuse de poster dans une conversation archivée.
     @Test
     void post_rejectsArchivedConversation() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
@@ -105,6 +107,7 @@ class MessagingServiceTest {
                 .satisfies(ex -> assertThatStatus(ex, HttpStatus.BAD_REQUEST));
     }
 
+    // Refuse un message direct d'un non-membre à un membre.
     @Test
     void create_rejectsNonMemberDmToMember() {
         SecurityTestSupport.authenticate(1L, "guest@example.com", Role.USER);
@@ -123,6 +126,7 @@ class MessagingServiceTest {
                 .satisfies(ex -> assertThatStatus(ex, HttpStatus.FORBIDDEN));
     }
 
+    // Refuse l'accès aux messages si pas membre de la conversation.
     @Test
     void messages_rejectsAdminWithoutMembership() {
         SecurityTestSupport.authenticate(99L, "admin@example.com", Role.ADMIN);
@@ -134,6 +138,7 @@ class MessagingServiceTest {
         verify(messageRepository, never()).findByConversationIdOrderByCreatedAtAsc(anyLong());
     }
 
+    // Crée un fil de balade et ajoute l'organisateur une seule fois.
     @Test
     void ensureWalkThread_createsOnceAndAddsOrganizer() {
         Walk walk = org.mockito.Mockito.mock(Walk.class);
@@ -160,6 +165,7 @@ class MessagingServiceTest {
         verify(memberRepository).save(any(ConversationMember.class));
     }
 
+    // Applique la limite de débit par heure.
     @Test
     void post_enforcesRateLimit() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);

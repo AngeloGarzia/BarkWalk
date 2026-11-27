@@ -23,6 +23,8 @@ import {
   reviewStatusLabel,
 } from '../../shared/labels';
 import { WalkDifficultyBarComponent } from '../../shared/walk-difficulty-bar/walk-difficulty-bar.component';
+import { WalkParticipantsComponent } from '../../shared/walk-participants/walk-participants.component';
+import { WalkRouteBadgeComponent } from '../../shared/walk-route-badge/walk-route-badge.component';
 
 interface OrganizedWalk {
   id: number;
@@ -52,6 +54,7 @@ interface OrganizedWalk {
   minSociabilityDogs?: string | null;
   routeHint?: string | null;
   routeGeojson?: RouteGeoJson | string | null;
+  participantDisplayNames?: string[] | null;
 }
 
 interface UserProfile {
@@ -86,6 +89,8 @@ interface UserProfile {
     DatePipe,
     DecimalPipe,
     WalkDifficultyBarComponent,
+    WalkRouteBadgeComponent,
+    WalkParticipantsComponent,
   ],
   template: `
     <div class="profile-page">
@@ -144,6 +149,9 @@ interface UserProfile {
           </div>
         </div>
 
+        @if (canAccessCalendar()) {
+          <a routerLink="/calendar" class="admin-link">Agenda des balades</a>
+        }
         @if (isAdmin()) {
           <a routerLink="/admin" class="admin-link">Administration</a>
         }
@@ -165,7 +173,10 @@ interface UserProfile {
               @for (walk of myWalks(); track walk.id) {
                 <li class="walk-tile">
                   <div class="walk-tile-main">
-                    <h3>{{ walk.title }}</h3>
+                    <h3>
+                      {{ walk.title }}
+                      <app-walk-route-badge [routeGeojson]="walk.routeGeojson" />
+                    </h3>
                     <p class="walk-meta">
                       {{ walk.cityName || 'Ville' }} · {{ walk.startsAt | date: 'short' }}
                     </p>
@@ -188,6 +199,7 @@ interface UserProfile {
                         <span class="tag status-tag" data-status="ARCHIVED">Archivée</span>
                       }
                     </div>
+                    <app-walk-participants [names]="walk.participantDisplayNames" />
                   </div>
                   <div class="tile-actions">
                     @if (canLaunchWalk(walk)) {
@@ -407,6 +419,10 @@ interface UserProfile {
         font-size: 0.98rem;
         color: var(--forest-deep);
         font-family: var(--font-display);
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
       }
       .walk-meta {
         margin: 0 0 0.45rem;
@@ -720,6 +736,10 @@ export class ProfileComponent implements OnInit {
 
   protected isAdmin(): boolean {
     return this.auth.isAdmin();
+  }
+
+  protected canAccessCalendar(): boolean {
+    return this.auth.canAccessCalendar();
   }
 
   protected readonly roleLabel = roleLabel;

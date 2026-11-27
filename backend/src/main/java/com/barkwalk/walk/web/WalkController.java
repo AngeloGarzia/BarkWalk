@@ -56,6 +56,12 @@ public class WalkController {
         return walkService.adminOverview(cityId, status);
     }
 
+    /** Agenda admin / organisateur : toutes les balades passées et à venir. */
+    @GetMapping("/calendar")
+    public List<WalkResponse> calendar() {
+        return walkService.calendarOverview();
+    }
+
     @GetMapping("/{id}")
     public WalkResponse get(@PathVariable Long id) {
         return walkService.get(id);

@@ -45,6 +45,7 @@ class PrivacyServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Un membre ne voit pas le téléphone d'un autre sans rôle balade.
     @Test
     void memberCannotSeeAnotherMembersPhoneWithoutWalkRole() {
         SecurityTestSupport.authenticate(10L, "member@example.com", Role.USER, Role.MEMBER);
@@ -52,6 +53,7 @@ class PrivacyServiceTest {
         assertThat(privacyService.phoneForViewer(10L, 20L, null)).isNull();
     }
 
+    // Un marcheur voit le téléphone si la cible a réservé sa balade.
     @Test
     void walkerSeesPhoneWhenTargetBookedOnTheirWalk() {
         SecurityTestSupport.authenticate(5L, "walker@example.com", Role.USER, Role.WALKER_STAFF);
@@ -80,6 +82,7 @@ class PrivacyServiceTest {
         assertThat(privacyService.phoneForViewer(5L, 20L, 100L)).isEqualTo("+33600000020");
     }
 
+    // Le nom d'affichage est anonymisé pour un compte supprimé.
     @Test
     void displayName_anonymizedWhenDeleted() {
         User user = new User();
@@ -89,6 +92,7 @@ class PrivacyServiceTest {
         assertThat(privacyService.displayName(3L)).isEqualTo(PrivacyService.ANONYMIZED_DISPLAY_NAME);
     }
 
+    // Utilise le profil pour le nom d'affichage si actif.
     @Test
     void displayName_usesProfileWhenActive() {
         User user = new User();
@@ -102,6 +106,7 @@ class PrivacyServiceTest {
         assertThat(privacyService.displayName(4L)).isEqualTo("Alice Martin");
     }
 
+    // Préfère le pseudo au nom réel pour l'affichage.
     @Test
     void displayName_prefersPseudo() {
         User user = new User();

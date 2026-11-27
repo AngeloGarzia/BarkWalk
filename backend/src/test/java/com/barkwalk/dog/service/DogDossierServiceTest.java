@@ -47,6 +47,7 @@ class DogDossierServiceTest {
     @InjectMocks
     private DogDossierService dogDossierService;
 
+    // Autorise la réservation si dossier validé avec docs.
     @Test
     void assertBookable_allowsValidatedWithRequiredDocs() {
         Dog dog = dog(5L, "VALIDATED");
@@ -58,6 +59,7 @@ class DogDossierServiceTest {
         assertThat(dog.getDossierStatus()).isEqualTo("VALIDATED");
     }
 
+    // Refuse la réservation si dossier non validé.
     @Test
     void assertBookable_rejectsUnvalidated() {
         Dog dog = dog(5L, "DRAFT");
@@ -70,6 +72,7 @@ class DogDossierServiceTest {
                 });
     }
 
+    // Refuse la réservation si dossier expiré.
     @Test
     void assertBookable_rejectsExpiredDossier() {
         Dog dog = dog(5L, "EXPIRED");
@@ -82,6 +85,7 @@ class DogDossierServiceTest {
                 });
     }
 
+    // Expire le dossier et signale les futures réservations.
     @Test
     void refreshExpiry_marksDossierExpiredAndFlagsFutureBooking() {
         Dog dog = dog(5L, "VALIDATED");
@@ -111,6 +115,7 @@ class DogDossierServiceTest {
         verify(auditService).log(eq(null), eq("DOG_DOSSIER_EXPIRED"), eq("DOG"), eq(5L), eq("scheduled"));
     }
 
+    // Ne signale pas une réservation passée expirée.
     @Test
     void refreshExpiry_doesNotFlagPastWalk() {
         Dog dog = dog(5L, "VALIDATED");
@@ -135,6 +140,7 @@ class DogDossierServiceTest {
         verify(bookingRepository, never()).save(any());
     }
 
+    // Exige les deux types de documents obligatoires.
     @Test
     void hasValidRequiredDocuments_requiresBothTypes() {
         when(documentRepository.findByDogId(5L))

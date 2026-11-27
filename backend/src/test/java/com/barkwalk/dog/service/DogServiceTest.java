@@ -73,6 +73,7 @@ class DogServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Crée un chien avec le statut brouillon et l'owner correct.
     @Test
     void create_setsDraftAndOwner() {
         when(dogRepository.save(any(Dog.class))).thenAnswer(inv -> {
@@ -86,6 +87,7 @@ class DogServiceTest {
         assertThat(response.name()).isEqualTo("Rex");
     }
 
+    // Interdit la modification d'un chien d'un autre utilisateur.
     @Test
     void update_forbiddenForForeignDog() {
         Dog dog = ownedDog(5L, 99L);
@@ -96,6 +98,7 @@ class DogServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Passe le statut en attente lors de la soumission.
     @Test
     void submit_setsPending() {
         Dog dog = ownedDog(5L, 1L);
@@ -104,6 +107,7 @@ class DogServiceTest {
         assertThat(response.dossierStatus()).isEqualTo("PENDING");
     }
 
+    // Passe en attente et enregistre si modification de champ sensible.
     @Test
     void update_validatedSensitiveField_setsPendingAndAudits() {
         Dog dog = ownedDog(5L, 1L);
@@ -144,6 +148,7 @@ class DogServiceTest {
                 .log(eq(1L), eq("DOG_SENSITIVE_EDIT"), eq("DOG"), eq(5L), org.mockito.ArgumentMatchers.anyString());
     }
 
+    // Reste validée si seule modification de champs libres.
     @Test
     void update_validatedFreeFieldOnly_keepsValidated() {
         Dog dog = ownedDog(5L, 1L);
@@ -185,6 +190,7 @@ class DogServiceTest {
         assertThat(response.name()).isEqualTo("Rexou");
     }
 
+    // Reste en brouillon après modification en brouillon.
     @Test
     void update_draftAnyField_staysDraft() {
         Dog dog = ownedDog(5L, 1L);
@@ -196,6 +202,7 @@ class DogServiceTest {
         assertThat(response.dossierStatus()).isEqualTo("DRAFT");
     }
 
+    // Exige le rôle admin pour valider.
     @Test
     void validate_requiresAdmin() {
         assertThatThrownBy(() -> dogService.validate(5L))
@@ -204,6 +211,7 @@ class DogServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Valide un dossier chien en tant qu'admin.
     @Test
     void validate_asAdmin() {
         SecurityTestSupport.clear();
@@ -217,6 +225,7 @@ class DogServiceTest {
         verify(auditService).log(eq(2L), eq("DOG_VALIDATE"), eq("DOG"), eq(5L), eq(null));
     }
 
+    // Refuse la validation sans documents obligatoires.
     @Test
     void validate_rejectsWithoutRequiredDocs() {
         SecurityTestSupport.clear();
@@ -233,6 +242,7 @@ class DogServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Refuse un dossier en tant qu'admin.
     @Test
     void refuse_asAdmin() {
         SecurityTestSupport.clear();
@@ -244,6 +254,7 @@ class DogServiceTest {
         assertThat(response.refusalReason()).isEqualTo("papers");
     }
 
+    // Ajoute et liste les documents d'un chien.
     @Test
     void addDocument_andList() {
         Dog dog = ownedDog(5L, 1L);
@@ -265,6 +276,7 @@ class DogServiceTest {
         assertThat(dogService.documents(5L)).isEmpty();
     }
 
+    // Liste les chiens de l'utilisateur et supprime un chien.
     @Test
     void myDogs_andDelete() {
         when(dogRepository.findByOwnerIdOrderByNameAsc(1L)).thenReturn(List.of());
@@ -275,12 +287,14 @@ class DogServiceTest {
         verify(dogRepository).delete(dog);
     }
 
+    // Liste les dossiers en attente de validation.
     @Test
     void pending_lists() {
         when(dogRepository.findByDossierStatus("PENDING")).thenReturn(List.of());
         assertThat(dogService.pending()).isEmpty();
     }
 
+    // Réinitialise en brouillon si pas validée après modification.
     @Test
     void update_resetsDraftWhenNotValidated() {
         Dog dog = ownedDog(5L, 1L);
@@ -291,6 +305,7 @@ class DogServiceTest {
         assertThat(response.breed()).isEqualTo("Berger");
     }
 
+    // Interdit l'accès aux documents pour un non-propriétaire.
     @Test
     void documents_forbiddenForForeignOwner() {
         Dog dog = ownedDog(5L, 99L);
@@ -301,6 +316,7 @@ class DogServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Liste les photos du propriétaire du chien.
     @Test
     void listPhotos_returnsOwnerPhotos() {
         Dog dog = ownedDog(5L, 1L);
@@ -312,6 +328,7 @@ class DogServiceTest {
         assertThat(dogService.listPhotos(5L).getFirst().id()).isEqualTo(9L);
     }
 
+    // Liste les documents avec URLs signées pour le propriétaire.
     @Test
     void documents_listsSignedUrlsForOwner() {
         Dog dog = ownedDog(5L, 1L);
@@ -328,6 +345,7 @@ class DogServiceTest {
         assertThat(dogService.documents(5L).getFirst().signedUrl()).isEqualTo("https://get");
     }
 
+    // Supprime les photos après validation de la transaction.
     @Test
     void delete_removesPhotosAfterCommitPath() {
         Dog dog = ownedDog(5L, 1L);
@@ -340,6 +358,7 @@ class DogServiceTest {
         verify(storageService).deleteObject("dogs/5/photos/a.jpg");
     }
 
+    // Stocke une photo pour le propriétaire du chien.
     @Test
     void uploadPhoto_storesImageForOwner() {
         Dog dog = ownedDog(5L, 1L);
@@ -368,6 +387,7 @@ class DogServiceTest {
         assertThat(dog.getPhotoKey()).isEqualTo("dogs/5/photos/a.jpg");
     }
 
+    // Refuse l'ajout d'une quatrième photo.
     @Test
     void uploadPhoto_rejectsFourthPhoto() {
         Dog dog = ownedDog(5L, 1L);
@@ -380,6 +400,7 @@ class DogServiceTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    // Interdit l'upload de photo pour un non-propriétaire.
     @Test
     void uploadPhoto_forbiddenForNonOwner() {
         Dog dog = ownedDog(5L, 99L);
@@ -391,6 +412,7 @@ class DogServiceTest {
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
+    // Supprime une photo et réindexe les autres.
     @Test
     void deletePhoto_reindexesRemaining() {
         Dog dog = ownedDog(5L, 1L);

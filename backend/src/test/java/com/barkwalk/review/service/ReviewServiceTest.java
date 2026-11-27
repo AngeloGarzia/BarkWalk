@@ -54,6 +54,7 @@ class ReviewServiceTest {
         SecurityTestSupport.clear();
     }
 
+    // Refuse l'avis en dehors de la fenêtre de temps.
     @Test
     void create_rejectsOutsideWindow() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
@@ -69,6 +70,7 @@ class ReviewServiceTest {
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
+    // Refuse sans réservation complétée commune.
     @Test
     void create_rejectsWithoutCompletedBookings() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
@@ -88,6 +90,7 @@ class ReviewServiceTest {
                         .isEqualTo(HttpStatus.FORBIDDEN));
     }
 
+    // Refuse les avis dupliqués du même auteur.
     @Test
     void create_rejectsDuplicate() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
@@ -98,6 +101,7 @@ class ReviewServiceTest {
                         .isEqualTo(HttpStatus.CONFLICT));
     }
 
+    // Crée un avis quand les deux ont complété la balade.
     @Test
     void create_okWhenBothCompleted() {
         SecurityTestSupport.authenticate(1L, "a@example.com", Role.USER, Role.MEMBER);
