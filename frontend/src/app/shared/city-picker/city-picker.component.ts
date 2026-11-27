@@ -101,14 +101,19 @@ import { CityService, City } from '../city.service';
 export class CityPickerComponent implements OnInit, OnDestroy {
   @Input() set initialCity(city: City | null | undefined) {
     if (city?.name) {
+      this.hadSelection = true;
       this.searchCtrl.setValue(city.name, { emitEvent: false });
+    } else {
+      this.hadSelection = false;
+      this.searchCtrl.setValue('', { emitEvent: false });
     }
   }
 
-  @Output() citySelected = new EventEmitter<City>();
+  @Output() citySelected = new EventEmitter<City | null>();
 
   private readonly cityService = inject(CityService);
   private sub?: Subscription;
+  private hadSelection = false;
 
   protected readonly results = signal<City[]>([]);
   readonly searchCtrl = new FormControl('');
@@ -121,6 +126,10 @@ export class CityPickerComponent implements OnInit, OnDestroy {
         switchMap((q) => {
           const query = (q ?? '').trim();
           if (!query) {
+            if (this.hadSelection) {
+              this.hadSelection = false;
+              this.citySelected.emit(null);
+            }
             return of([]);
           }
           // CP : dès 2 chiffres ; nom de ville : dès 2 lettres.
@@ -140,6 +149,7 @@ export class CityPickerComponent implements OnInit, OnDestroy {
 
   protected select(city: City): void {
     this.results.set([]);
+    this.hadSelection = true;
     this.searchCtrl.setValue(city.name, { emitEvent: false });
     this.citySelected.emit(city);
   }

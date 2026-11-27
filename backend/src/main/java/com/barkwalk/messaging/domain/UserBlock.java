@@ -24,10 +24,17 @@ public class UserBlock {
         public void setBlockerId(Long blockerId) { this.blockerId = blockerId; }
         public Long getBlockedId() { return blockedId; }
         public void setBlockedId(Long blockedId) { this.blockedId = blockedId; }
+        @Override
         public boolean equals(Object o) {
-            if (!(o instanceof Pk pk)) return false;
+            if (!(o instanceof Pk pk)) {
+                return false;
+            }
             return Objects.equals(blockerId, pk.blockerId) && Objects.equals(blockedId, pk.blockedId);
         }
-        public int hashCode() { return Objects.hash(blockerId, blockedId); }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(blockerId, blockedId);
+        }
     }
 }

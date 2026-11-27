@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HexFormat;
-import java.util.Locale;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -74,7 +73,10 @@ public class StorageService {
         String key = createObjectKey(folder, "photo." + detected.extension());
         Path target = resolveSafe(key);
         try {
-            Files.createDirectories(target.getParent());
+            Path parent = target.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             try (InputStream in = file.getInputStream()) {
                 Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
             }

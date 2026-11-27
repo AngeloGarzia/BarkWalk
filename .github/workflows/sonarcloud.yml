@@ -1,0 +1,59 @@
+name: SonarCloud
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: sonarcloud-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: Analyze
+    runs-on: ubuntu-latest
+    env:
+      # Les secrets ne sont pas utilisables dans if: job — on teste via env.
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if SONAR_TOKEN missing
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "SONAR_TOKEN absent — analyse SonarCloud ignorée (voir docs/QUALITY.md)."
+          echo "Ajoute le secret Actions SONAR_TOKEN pour activer ce job."
+
+      - name: Set up JDK 21
+        if: env.SONAR_TOKEN != ''
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Cache Sonar packages
+        if: env.SONAR_TOKEN != ''
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Backend verify + SonarCloud
+        if: env.SONAR_TOKEN != ''
+        run: |
+          ORG="${SONAR_ORGANIZATION:-angelogarzia}"
+          KEY="${SONAR_PROJECT_KEY:-AngeloGarzia_BarkWalk}"
+          mvn -B -pl backend -am verify \
+            org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -Dsonar.organization="$ORG" \
+            -Dsonar.projectKey="$KEY"

@@ -5,6 +5,7 @@ import {
   ElementRef,
   EventEmitter,
   Input,
+  OnDestroy,
   Output,
   ViewChild,
   inject,
@@ -270,7 +271,7 @@ export interface PhotoItem {
     `,
   ],
 })
-export class PhotoUploaderComponent {
+export class PhotoUploaderComponent implements OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -296,10 +297,20 @@ export class PhotoUploaderComponent {
   protected readonly selectedDeviceId = signal<string>('');
 
   private stream: MediaStream | null = null;
+  private openingCamera = false;
+
+  ngOnDestroy(): void {
+    this.stopStream();
+  }
 
   protected async openCamera(): Promise<void> {
+    if (this.openingCamera || this.cameraOpen() || this.uploading()) {
+      return;
+    }
+    this.openingCamera = true;
     this.error.set(null);
     if (!navigator.mediaDevices?.getUserMedia) {
+      this.openingCamera = false;
       this.error.set('Caméra non disponible sur cet appareil.');
       return;
     }
@@ -312,6 +323,8 @@ export class PhotoUploaderComponent {
     } catch {
       this.closeCamera();
       this.error.set('Impossible d’accéder à la caméra (permission refusée ?).');
+    } finally {
+      this.openingCamera = false;
     }
   }
 
@@ -435,9 +448,13 @@ export class PhotoUploaderComponent {
 
   private async startStream(deviceId?: string): Promise<void> {
     this.stopStream();
-    const video: boolean | MediaTrackConstraints = deviceId
+    const video: MediaTrackConstraints = deviceId
       ? { deviceId: { exact: deviceId } }
-      : true;
+      : {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        };
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video,

@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -464,11 +463,11 @@ public class MessagingService {
                 .map(m -> new MemberSummary(m.getUserId(), privacyService.displayName(m.getUserId())))
                 .toList();
 
+        Long walkId = c.getWalkId();
         String title = switch (c.getConversationType() == null ? "" : c.getConversationType().toUpperCase(Locale.ROOT)) {
-            case "WALK" -> walkRepository
-                    .findById(c.getWalkId() == null ? -1L : c.getWalkId())
-                    .map(Walk::getTitle)
-                    .orElse("Balade");
+            case "WALK" -> walkId == null
+                    ? "Balade"
+                    : walkRepository.findById(walkId).map(Walk::getTitle).orElse("Balade");
             case "DIRECT" -> memberSummaries.stream()
                     .filter(m -> !m.userId().equals(viewerId))
                     .map(MemberSummary::displayName)

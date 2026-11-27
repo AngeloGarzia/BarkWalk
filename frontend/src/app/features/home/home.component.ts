@@ -909,7 +909,7 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected clearQuery(): void {
     this.query.set('');
-    this.refreshMapForSelection();
+    this.refreshMapForSelection({ forceFrance: true });
   }
 
   protected daysUntilLabel(startsAt: string): string {
@@ -1013,25 +1013,31 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private refreshMapForSelection(): void {
+  private refreshMapForSelection(options: { forceFrance?: boolean } = {}): void {
     const source = this.filteredWalks();
     const withCoords = source.filter(
       (w) => w.lat != null && w.lng != null && Number.isFinite(w.lat) && Number.isFinite(w.lng),
     );
     this.pendingWalks = withCoords;
     this.pinCount.set(withCoords.length);
-    this.renderPendingMarkers();
+    this.renderPendingMarkers(options);
   }
 
-  private renderPendingMarkers(): void {
+  private renderPendingMarkers(options: { forceFrance?: boolean } = {}): void {
     if (!this.mapReady || this.pendingWalks === null) {
       return;
     }
     const focused = !!this.query().trim() && this.pendingWalks.length > 0;
-    this.placeMarkers(this.pendingWalks, { cityFocus: focused });
+    this.placeMarkers(this.pendingWalks, {
+      cityFocus: focused,
+      forceFrance: options.forceFrance,
+    });
   }
 
-  private placeMarkers(walks: WalkPin[], options: { cityFocus?: boolean } = {}): void {
+  private placeMarkers(
+    walks: WalkPin[],
+    options: { cityFocus?: boolean; forceFrance?: boolean } = {},
+  ): void {
     const map = this.map;
     if (!map) {
       return;
@@ -1065,6 +1071,11 @@ export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
 
       this.markers.push(marker);
       this.markerEls.set(walk.id, el);
+    }
+
+    if (options.forceFrance) {
+      map.flyTo({ center: [2.5, 46.6], zoom: 5.1, duration: 700 });
+      return;
     }
 
     const cityFocus = !!options.cityFocus;

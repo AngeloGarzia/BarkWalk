@@ -15,6 +15,7 @@ import com.barkwalk.review.repository.WalkRatingRepository;
 import com.barkwalk.support.SecurityTestSupport;
 import com.barkwalk.user.domain.Profile;
 import com.barkwalk.user.repository.ProfileRepository;
+import com.barkwalk.user.service.CommunityOrgService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
@@ -46,6 +47,8 @@ class WalkRatingServiceTest {
     private ProfileRepository profileRepository;
     @Mock
     private WalkerProfileRepository walkerProfileRepository;
+    @Mock
+    private CommunityOrgService communityOrgService;
 
     @InjectMocks
     private WalkRatingService walkRatingService;

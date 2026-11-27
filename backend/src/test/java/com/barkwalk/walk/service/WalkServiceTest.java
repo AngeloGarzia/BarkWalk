@@ -25,6 +25,7 @@ import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
 import com.barkwalk.walk.dto.WalkDtos.WalkUpdateRequest;
+import com.barkwalk.walker.domain.WalkerProfile;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
 import com.barkwalk.walker.service.WalkerPublishEligibility;
 import java.time.Instant;
@@ -143,6 +144,11 @@ class WalkServiceTest {
         when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
         when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
         when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+        WalkerProfile walker = new WalkerProfile();
+        setId(walker, 10L);
+        walker.setUserId(2L);
+        when(walkerProfileRepository.findById(10L)).thenReturn(Optional.of(walker));
+        when(walkerProfileRepository.findByUserId(2L)).thenReturn(Optional.of(walker));
 
         var response = walkService.create(createRequest("STAFF_GUIDED"));
         assertThat(response.id()).isEqualTo(50L);

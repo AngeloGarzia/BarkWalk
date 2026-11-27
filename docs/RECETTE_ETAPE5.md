@@ -44,7 +44,7 @@
 ## Checklist sécurité
 
 - [x] Jetons refresh / magic : hash stocké (`token_hash`)
-- [x] Famille refresh + colonnes rotation / réutilisation (V5) — logique app rotation à brancher
+- [x] Famille refresh + colonnes rotation / réutilisation (V5) — rotation + invalidation famille en app
 - [x] Documents : clés ≥ 16 car., pas d’URL publique en schéma
 - [x] Droits par ligne : à appliquer côté service (schéma prêt UUID publics)
 - [x] Audit append-only (trigger V6) + REVOKE UPDATE/DELETE rôle app
@@ -53,9 +53,10 @@
 - [x] Rôles DB `barkwalk_app` / `_migrator` / `_readonly` (V6, sans secret en repo)
 - [x] Pas de secret / MDP rôle dans Git
 - [x] Identifiants publics UUID (users, dogs, walks, bookings, …)
-- [ ] Rate-limit / verrouillage login : colonnes prêtes, filtre app à renforcer
+- [x] Rate-limit / verrouillage login (Bucket4j + compteur échecs)
 - [x] Liens médias signés HMAC (`/api/media/...?exp=&sig=`) ; S3/MinIO à brancher avant prod
 - [ ] Confirmation paiement uniquement via webhook : à verrouiller côté service (confirmPayment browser encore présent)
+- [x] CI : backend `mvn verify` + frontend `npm run test:ci` (Node 24.12)
 
 ## Risques / points ouverts
 

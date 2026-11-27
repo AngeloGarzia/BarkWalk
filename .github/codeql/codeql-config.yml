@@ -1,0 +1,15 @@
+name: BarkWalk CodeQL
+
+paths:
+  - backend
+  - frontend
+
+paths-ignore:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/target/**"
+  - "**/coverage/**"
+  - "**/*.min.js"
+
+queries:
+  - security-and-quality

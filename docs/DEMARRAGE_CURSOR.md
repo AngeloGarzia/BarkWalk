@@ -12,7 +12,7 @@ Guide pas à pas pour lancer l’appli **depuis Cursor** sur Windows (PowerShell
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | récent | `docker --version` |
 | [Java JDK](https://adoptium.net/) | **21** | `java -version` |
 | [Maven](https://maven.apache.org/) | 3.9+ | `mvn -version` |
-| [Node.js](https://nodejs.org/) (LTS) | 20+ | `node -v` / `npm -v` |
+| [Node.js](https://nodejs.org/) | **24.12.0** (voir `.nvmrc`) | `node -v` / `npm -v` |
 | Git | — | `git --version` |
 
 Docker Desktop doit être **démarré** (icône baleine dans la barre des tâches) avant `docker compose`.

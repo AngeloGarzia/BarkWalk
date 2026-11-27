@@ -25,6 +25,8 @@
         <!-- Seuils bloquants étape 1 CI -->
         <jacoco.bundle.line.minimum>0.80</jacoco.bundle.line.minimum>
         <jacoco.critical.line.minimum>0.90</jacoco.critical.line.minimum>
+        <checkstyle.config.location>${project.basedir}/config/checkstyle/checkstyle.xml</checkstyle.config.location>
+        <spotbugs.excludeFilterFile>${project.basedir}/config/spotbugs/exclude.xml</spotbugs.excludeFilterFile>
     </properties>
 
     <dependencies>
@@ -237,6 +239,55 @@
                         <include>**/*IT.java</include>
                     </includes>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <configuration>
+                    <configLocation>${checkstyle.config.location}</configLocation>
+                    <propertyExpansion>config_loc=${project.basedir}/config/checkstyle</propertyExpansion>
+                    <consoleOutput>true</consoleOutput>
+                    <failsOnError>true</failsOnError>
+                    <failOnViolation>true</failOnViolation>
+                    <violationSeverity>warning</violationSeverity>
+                    <includeTestSourceDirectory>false</includeTestSourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Medium</threshold>
+                    <failOnError>true</failOnError>
+                    <xmlOutput>true</xmlOutput>
+                    <excludeFilterFile>${spotbugs.excludeFilterFile}</excludeFilterFile>
+                    <plugins>
+                        <plugin>
+                            <groupId>com.h3xstream.findsecbugs</groupId>
+                            <artifactId>findsecbugs-plugin</artifactId>
+                            <version>${findsecbugs.version}</version>
+                        </plugin>
+                    </plugins>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>

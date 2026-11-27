@@ -158,8 +158,11 @@ public class AuthService {
     }
 
     public void requestMagicLink(String email) {
-        // Stub: in production, persist token + send email via Brevo/Mailhog
-        userRepository.findByEmailIgnoreCase(email).orElse(null);
+        // Stub anti-énumération : même réponse que l’email existe ou non.
+        // Prod : persister un token + envoi Brevo/Mailhog pour `email`.
+        if (email == null || email.isBlank()) {
+            return;
+        }
     }
 
     // Seule l'empreinte SHA-256 du refresh est enregistrée ; le client reçoit la valeur brute une fois.

@@ -25,5 +25,59 @@
     <properties>
         <java.version>21</java.version>
         <springdoc.version>3.2.1</springdoc.version>
+
+        <!-- Qualité statique -->
+        <checkstyle.version>10.21.4</checkstyle.version>
+        <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
+        <findsecbugs.version>1.14.0</findsecbugs.version>
+        <sonar-maven-plugin.version>5.1.0.4751</sonar-maven-plugin.version>
+
+        <!-- SonarCloud (override via -D si besoin) -->
+        <sonar.organization>angelogarzia</sonar.organization>
+        <sonar.projectKey>AngeloGarzia_BarkWalk</sonar.projectKey>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.java.source>${java.version}</sonar.java.source>
+        <sonar.coverage.jacoco.xmlReportPaths>
+            ${project.basedir}/backend/target/site/jacoco/jacoco.xml
+        </sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.exclusions>
+            **/generated/**,**/*MapperImpl.java,**/node_modules/**,**/dist/**
+        </sonar.exclusions>
+        <sonar.coverage.exclusions>
+            **/domain/**,**/dto/**,**/*Dtos.java,**/config/**,**/BarkWalkApplication.java
+        </sonar.coverage.exclusions>
+        <sonar.cpd.exclusions>
+            **/domain/**,**/dto/**,**/*Dtos.java
+        </sonar.cpd.exclusions>
     </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-checkstyle-plugin</artifactId>
+                    <version>${maven-checkstyle-plugin.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.puppycrawl.tools</groupId>
+                            <artifactId>checkstyle</artifactId>
+                            <version>${checkstyle.version}</version>
+                        </dependency>
+                    </dependencies>
+                </plugin>
+                <plugin>
+                    <groupId>com.github.spotbugs</groupId>
+                    <artifactId>spotbugs-maven-plugin</artifactId>
+                    <version>${spotbugs-maven-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>

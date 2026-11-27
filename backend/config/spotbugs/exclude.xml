@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Faux positifs Spring / JPA / API JWT — affiner au fil des analyses. -->
+<FindBugsFilter>
+    <!-- Injection de dépendances Spring : stocker des beans n'est pas une fuite -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Entités / DTO : champs lus/écrits par JPA ou Jackson -->
+    <Match>
+        <Bug pattern="URF_UNREAD_FIELD,UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR,UWF_UNWRITTEN_FIELD,UUF_UNUSED_FIELD"/>
+        <Or>
+            <Package name="~com\.barkwalk\..*\.domain"/>
+            <Package name="~com\.barkwalk\..*\.dto"/>
+            <Class name="~.*Dtos(\$.*)?"/>
+        </Or>
+    </Match>
+
+    <!-- API JWT sans session : CSRF désactivé volontairement -->
+    <Match>
+        <Bug pattern="SPRING_CSRF_PROTECTION_DISABLED"/>
+        <Class name="com.barkwalk.config.SecurityConfig"/>
+    </Match>
+
+    <!-- Constructeurs qui valident et throw : pattern courant -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- Seed / démo : méthodes privées en cours d'évolution -->
+    <Match>
+        <Bug pattern="UPM_UNCALLED_PRIVATE_METHOD"/>
+        <Class name="com.barkwalk.config.DemoDataInitializer"/>
+    </Match>
+
+    <!-- Logs applicatifs : params contrôlés côté serveur (FindSecBugs bruyant) -->
+    <Match>
+        <Bug pattern="CRLF_INJECTION_LOGS"/>
+    </Match>
+
+    <!-- Tests -->
+    <Match>
+        <Bug pattern="NP_NONNULL_PARAM_VIOLATION,NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/>
+        <Class name="~.*Test(\$.*)?"/>
+    </Match>
+</FindBugsFilter>

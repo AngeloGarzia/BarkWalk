@@ -163,12 +163,13 @@ class AuthServiceTest {
         assertThat(stored.isRevoked()).isTrue();
     }
 
-    // Ne lève pas d'erreur pour email inconnu (sécurité).
+    // Stub magic-link : pas d'exception et pas d'énumération via le repository.
     @Test
     void magicLink_doesNotThrowWhenUnknownEmail() {
-        when(userRepository.findByEmailIgnoreCase("ghost@example.com")).thenReturn(Optional.empty());
         authService.requestMagicLink("ghost@example.com");
-        verify(userRepository).findByEmailIgnoreCase("ghost@example.com");
+        authService.requestMagicLink(" ");
+        authService.requestMagicLink(null);
+        verify(userRepository, never()).findByEmailIgnoreCase(anyString());
     }
 
     private static User user(long id, String email, Set<Role> roles) {

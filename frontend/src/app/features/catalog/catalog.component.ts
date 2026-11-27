@@ -121,6 +121,9 @@ interface RosterResponse {
 
       <div class="filter-bar">
         <app-city-picker [initialCity]="selectedCity()" (citySelected)="onCity($event)" />
+        @if (selectedCity()) {
+          <button type="button" class="clear-city" (click)="clearCity()">Toute la France</button>
+        }
       </div>
 
       @if (createHint()) {
@@ -584,8 +587,24 @@ interface RosterResponse {
         font-size: 0.92rem;
       }
       .filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.65rem 1rem;
         margin-bottom: 1rem;
         max-width: 100%;
+      }
+      .clear-city {
+        border: none;
+        background: transparent;
+        color: var(--forest);
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
       .rollcall-block {
         margin: 0 0 1.2rem;
@@ -1390,7 +1409,11 @@ export class CatalogComponent implements OnInit, OnDestroy {
     }
   }
 
-  protected onCity(city: City): void {
+  protected onCity(city: City | null): void {
+    if (!city) {
+      this.clearCity();
+      return;
+    }
     this.selectedCity.set(city);
     this.citySelection.setCity(city);
     this.createHint.set(null);
@@ -1402,6 +1425,21 @@ export class CatalogComponent implements OnInit, OnDestroy {
       this.reloadAdminOverview(city.id);
     } else {
       this.reloadArchived(city.id);
+    }
+  }
+
+  protected clearCity(): void {
+    this.selectedCity.set(null);
+    this.citySelection.setCity(null);
+    this.createHint.set(null);
+    this.closeCreateModal();
+    this.openRegions.set(new Set());
+    this.openDepts.set(new Set());
+    this.walks.set([]);
+    this.archived.set([]);
+    this.archivedError.set(null);
+    if (this.auth.isAdmin()) {
+      this.reloadAdminOverview(null);
     }
   }
 

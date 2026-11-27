@@ -14,7 +14,6 @@ import com.barkwalk.common.SecurityUtils;
 import com.barkwalk.dog.domain.Dog;
 import com.barkwalk.dog.repository.DogRepository;
 import com.barkwalk.dog.service.DogDossierService;
-import com.barkwalk.payment.domain.Payment;
 import com.barkwalk.payment.repository.PaymentRepository;
 import com.barkwalk.messaging.service.MessagingService;
 import com.barkwalk.walk.domain.Walk;

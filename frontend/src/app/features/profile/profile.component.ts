@@ -124,7 +124,7 @@ interface UserProfile {
             }
             <p class="email">{{ p.email }}</p>
             <div class="roles">
-              @for (role of p.roles ?? []; track role) {
+              @for (role of p.roles; track role) {
                 <span class="role-badge">{{ roleLabel(role) }}</span>
               }
             </div>
@@ -764,9 +764,9 @@ export class ProfileComponent implements OnInit {
     this.profile.set({ ...current, photos });
   }
 
-  protected onCity(city: City): void {
+  protected onCity(city: City | null): void {
     this.selectedCity.set(city);
-    this.form.patchValue({ cityId: city.id });
+    this.form.patchValue({ cityId: city?.id ?? null });
   }
 
   protected startEdit(): void {

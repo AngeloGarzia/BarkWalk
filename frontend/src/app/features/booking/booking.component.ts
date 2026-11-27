@@ -432,7 +432,7 @@ interface WalkHistoryPayload {
                       <button
                         type="button"
                         class="star-btn"
-                        [class.active]="(draftStars()[r.walkId] ?? 0) >= star"
+                        [class.active]="draftStar(r.walkId) >= star"
                         [disabled]="actingId() === r.walkId"
                         (click)="setDraftStar(r.walkId, star)"
                       >
@@ -445,7 +445,7 @@ interface WalkHistoryPayload {
                     <input
                       type="text"
                       maxlength="400"
-                      [value]="draftComments()[r.walkId] ?? ''"
+                      [value]="draftComment(r.walkId)"
                       (input)="setDraftComment(r.walkId, $event)"
                     />
                   </label>
@@ -454,7 +454,7 @@ interface WalkHistoryPayload {
                   <button
                     type="button"
                     class="btn-primary"
-                    [disabled]="!(draftStars()[r.walkId] > 0) || actingId() === r.walkId"
+                    [disabled]="draftStar(r.walkId) <= 0 || actingId() === r.walkId"
                     (click)="submitRating(r)"
                   >
                     {{ actingId() === r.walkId ? 'Envoi…' : 'Envoyer' }}
@@ -917,6 +917,14 @@ export class BookingComponent implements OnInit {
   protected readonly myRatings = signal<WalkRatingRow[]>([]);
   protected readonly draftStars = signal<Record<number, number>>({});
   protected readonly draftComments = signal<Record<number, string>>({});
+
+  protected draftStar(walkId: number): number {
+    return this.draftStars()[walkId] ?? 0;
+  }
+
+  protected draftComment(walkId: number): string {
+    return this.draftComments()[walkId] ?? '';
+  }
   protected readonly starValues = [1, 2, 3, 4, 5];
 
   protected readonly walkLoading = signal(false);

@@ -10,6 +10,7 @@ BarkWalk/
 ├── docker-compose.yml      # Postgres + MinIO + Mailhog
 ├── backend/                # API Spring Boot (JWT, CRUD métier)
 ├── frontend/               # Angular (auth, catalogue, chiens, admin…)
+├── .nvmrc                  # Node 24.12.0 (CI + local)
 └── .env.example
 ```
 
@@ -21,8 +22,9 @@ BarkWalk/
 | Starters | WebMVC, JPA, Security, Validation, Actuator, Flyway, Mail, Cache, OAuth2 client |
 | Extra | JWT (jjwt), Stripe, AWS S3 SDK, Bucket4j, springdoc 3.2.1 |
 | DB | PostgreSQL 17 + Flyway |
-| Front | Angular **21**, MapLibre, date-fns |
+| Front | Angular **21**, MapLibre, date-fns, Node **24.12** |
 | Infra locale | MinIO (docs), Mailhog (emails) |
+| CI | GitHub Actions : `mvn verify` (JaCoCo + Checkstyle + SpotBugs) + `npm run test:ci` + CodeQL + SonarCloud |
 
 ## Démarrage
 
@@ -31,6 +33,8 @@ docker compose up -d
 mvn -pl backend spring-boot:run
 cd frontend && npm start
 ```
+
+Node : utiliser la version de `.nvmrc` (`nvm use` / `fnm use`) avant `npm ci`.
 
 > Postgres est exposé sur le port **5434** (5432/5433 souvent déjà pris sur cette machine).
 
@@ -78,6 +82,14 @@ cd frontend && npm start
 
 Recherche publique par **nom** ou **code postal** (`GET /api/cities?q=69001` ou `q=Lyon`).  
 Seed : Lyon (plusieurs CP), Paris, Marseille, Toulouse, Bordeaux, Nantes, etc.
+
+## Qualité
+
+Checkstyle, SpotBugs (+ FindSecBugs), CodeQL et SonarCloud : voir [`docs/QUALITY.md`](docs/QUALITY.md).
+
+```bash
+mvn -pl backend -am verify   # inclut checkstyle:check + spotbugs:check
+```
 
 ## Avant déploiement
 

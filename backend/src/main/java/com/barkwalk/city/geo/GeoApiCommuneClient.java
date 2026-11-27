@@ -50,9 +50,20 @@ public class GeoApiCommuneClient {
             }
             return Arrays.asList(body);
         } catch (RestClientException ex) {
-            log.warn("geo.api.gouv.fr unavailable for {}={}: {}", param, value, ex.getMessage());
+            log.warn(
+                    "geo.api.gouv.fr unavailable for {}={}: {}",
+                    sanitizeLog(param),
+                    sanitizeLog(value),
+                    sanitizeLog(ex.getMessage()));
             return List.of();
         }
+    }
+
+    private static String sanitizeLog(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('\r', '_').replace('\n', '_');
     }
 
     public record GeoCommune(

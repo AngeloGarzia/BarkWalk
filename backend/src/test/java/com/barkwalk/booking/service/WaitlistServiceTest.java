@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -188,6 +189,9 @@ class WaitlistServiceTest {
         when(waitlistEntryRepository.findByWalkIdAndStatusOrderByPositionAsc(10L, "OFFERED"))
                 .thenReturn(List.of(offered));
         waitlistService.offerNext(10L);
+
+        verify(waitlistEntryRepository, never()).save(any());
+        verify(notificationService, never()).notifyWaitlistOffer(any(), any(), any());
     }
 
     // Expire les offres périmées avant de proposer la suivante.
