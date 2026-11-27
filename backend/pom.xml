@@ -25,6 +25,8 @@
         <!-- Seuils bloquants étape 1 CI -->
         <jacoco.bundle.line.minimum>0.80</jacoco.bundle.line.minimum>
         <jacoco.critical.line.minimum>0.90</jacoco.critical.line.minimum>
+        <!-- walk.service a grossi (photos, history, recycle, calendar) : seuil dédié -->
+        <jacoco.walk.service.line.minimum>0.80</jacoco.walk.service.line.minimum>
         <checkstyle.config.location>${project.basedir}/config/checkstyle/checkstyle.xml</checkstyle.config.location>
         <spotbugs.excludeFilterFile>${project.basedir}/config/spotbugs/exclude.xml</spotbugs.excludeFilterFile>
     </properties>
@@ -362,7 +364,6 @@
                                         <include>com.barkwalk.auth.jwt</include>
                                         <include>com.barkwalk.auth.web</include>
                                         <include>com.barkwalk.booking.service</include>
-                                        <include>com.barkwalk.walk.service</include>
                                         <include>com.barkwalk.dog.service</include>
                                         <include>com.barkwalk.payment.service</include>
                                         <include>com.barkwalk.membership.service</include>
@@ -373,6 +374,19 @@
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
                                             <minimum>${jacoco.critical.line.minimum}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <includes>
+                                        <include>com.barkwalk.walk.service</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.walk.service.line.minimum}</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

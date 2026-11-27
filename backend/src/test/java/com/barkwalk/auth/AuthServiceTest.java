@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -121,6 +123,79 @@ class AuthServiceTest {
         TokenResponse tokens = authService.login(new LoginRequest("user@example.com", "Secret1!"));
         assertThat(tokens.tokenType()).isEqualTo("Bearer");
         verify(authenticationManager).authenticate(any());
+    }
+
+    // Refuse le login si le compte est encore verrouillé.
+    @Test
+    void login_rejectsLockedAccount() {
+        User user = user(7L, "user@example.com", Set.of(Role.USER));
+        user.setLockedUntil(Instant.now().plus(10, ChronoUnit.MINUTES));
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("user@example.com", "Secret1!")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.LOCKED);
+                });
+        verify(authenticationManager, never()).authenticate(any());
+    }
+
+    // Incrémente les échecs et verrouille au 5e essai.
+    @Test
+    void login_failedAuth_incrementsAttemptsAndLocksAtMax() {
+        User user = user(7L, "user@example.com", Set.of(Role.USER));
+        user.setFailedLoginAttempts(4);
+        when(userRepository.findByEmailIgnoreCase("user@example.com")).thenReturn(Optional.of(user));
+        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("bad"));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("user@example.com", "Wrong!")))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        assertThat(user.getLockedUntil()).isAfter(Instant.now());
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        verify(userRepository).save(user);
+    }
+
+    // Refuse un refresh inconnu.
+    @Test
+    void refresh_rejectsUnknownToken() {
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> authService.refresh("raw-token"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    // Révoque toute la famille si un refresh déjà révoqué est réutilisé.
+    @Test
+    void refresh_revokedTokenRevokesFamily() {
+        java.util.UUID family = java.util.UUID.randomUUID();
+        RefreshToken stored = new RefreshToken();
+        stored.setUserId(7L);
+        stored.setFamilyId(family);
+        stored.setRevoked(true);
+        stored.setExpiresAt(Instant.now().plus(1, ChronoUnit.DAYS));
+        RefreshToken sibling = new RefreshToken();
+        sibling.setFamilyId(family);
+        sibling.setRevoked(false);
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
+        when(refreshTokenRepository.findByFamilyId(family)).thenReturn(java.util.List.of(stored, sibling));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThatThrownBy(() -> authService.refresh("raw-token"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+                    assertThat(rse.getReason()).contains("reuse");
+                });
+        assertThat(stored.getReusedAt()).isNotNull();
+        assertThat(sibling.isRevoked()).isTrue();
+        verify(refreshTokenRepository, times(3)).save(any(RefreshToken.class));
     }
 
     // Refuse de rafraîchir un jeton expiré.

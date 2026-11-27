@@ -503,6 +503,65 @@ class BookingServiceTest {
         verify(waitlistEntryRepository).saveAndFlush(any());
     }
 
+    // Refuse de réserver une balade déjà commencée / passée.
+    @Test
+    void create_rejectsPastWalk() {
+        Walk walk = staffWalk(10L, 4);
+        walk.setStartsAt(java.time.Instant.now().minusSeconds(60));
+        Dog dog = validatedDog(5L, 1L);
+        when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+
+        assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("past");
+                });
+    }
+
+    // Refuse une double inscription waitlist.
+    @Test
+    void create_rejectsDuplicateWaitlist() {
+        Walk walk = staffWalk(10L, 1);
+        Dog dog = validatedDog(5L, 1L);
+        when(walkRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(walk));
+        when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
+        when(bookingRepository.existsByWalkIdAndDogIdAndStatusNotIn(eq(10L), eq(5L), any())).thenReturn(false);
+        when(bookingRepository.countByWalkIdAndStatusIn(eq(10L), any())).thenReturn(1L);
+        when(waitlistEntryRepository.existsByWalkIdAndDogIdAndStatusIn(eq(10L), eq(5L), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, false)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(rse.getReason()).contains("waitlist");
+                });
+    }
+
+    // Refuse l'annulation après le début de la balade.
+    @Test
+    void cancel_rejectsAfterWalkStart() {
+        Booking booking = new Booking();
+        booking.setUserId(1L);
+        booking.setWalkId(10L);
+        booking.setStatus("CONFIRMED");
+        Walk walk = staffWalk(10L, 4);
+        walk.setStartsAt(java.time.Instant.now().minusSeconds(30));
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(booking));
+        when(walkRepository.findById(10L)).thenReturn(Optional.of(walk));
+
+        assertThatThrownBy(() -> bookingService.cancel(3L))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("after walk start");
+                });
+    }
+
     private static Walk staffWalk(long id, int capacity) {
         Walk walk = new Walk();
         try {

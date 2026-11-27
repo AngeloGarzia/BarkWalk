@@ -33,4 +33,18 @@ class WalkDifficultyCalculatorTest {
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
+
+    // Terrain vide → FLAT ; dénivelé hors bornes refusé.
+    @Test
+    void normalize_defaultsAndBounds() {
+        assertThat(calculator.normalizeTerrain(null)).isEqualTo("FLAT");
+        assertThat(calculator.normalizeTerrain("  ")).isEqualTo("FLAT");
+        assertThat(calculator.normalizeElevation(null)).isZero();
+        assertThatThrownBy(() -> calculator.normalizeElevation(-1))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> calculator.normalizeElevation(4000))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(calculator.compute(20, 0, "PARK")).isBetween(1, 3);
+        assertThat(calculator.compute(100, 100, "TRAIL")).isBetween(4, 8);
+    }
 }

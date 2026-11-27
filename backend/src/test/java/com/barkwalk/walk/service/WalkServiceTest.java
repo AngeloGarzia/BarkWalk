@@ -7,8 +7,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.barkwalk.admin.service.BusinessSettingsService;
+import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
+import com.barkwalk.review.domain.WalkRating;
+import com.barkwalk.walk.dto.WalkPhotoDtos.WalkHistoryResponse;
+import com.barkwalk.walk.dto.WalkPhotoDtos.WalkPhotoResponse;
 import com.barkwalk.city.domain.City;
 import com.barkwalk.city.repository.CityRepository;
 import com.barkwalk.common.PrivacyService;
@@ -24,6 +28,7 @@ import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.MeetingPointRepository;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walk.dto.WalkDtos.WalkCreateRequest;
+import com.barkwalk.walk.dto.WalkDtos.WalkRecycleRequest;
 import com.barkwalk.walk.dto.WalkDtos.WalkUpdateRequest;
 import com.barkwalk.walker.domain.WalkerProfile;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
@@ -118,6 +123,268 @@ class WalkServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    // Retourne une balade publiée visible.
+    @Test
+    void get_returnsPublishedWalk() {
+        Walk walk = publishedWalk(9L, 5L);
+        when(walkRepository.findById(9L)).thenReturn(Optional.of(walk));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        var response = walkService.get(9L);
+        assertThat(response.id()).isEqualTo(9L);
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+    }
+
+    // Archive une balade et annule les réservations actives.
+    @Test
+    void archive_cancelsActiveBookings() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
+        Walk walk = publishedWalk(40L, 5L);
+        Booking booking = new Booking();
+        setId(booking, 1L);
+        booking.setWalkId(40L);
+        booking.setUserId(8L);
+        booking.setStatus("CONFIRMED");
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(walk));
+        when(bookingRepository.findByWalkId(40L)).thenReturn(List.of(booking));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        var response = walkService.archive(40L);
+        assertThat(response.status()).isEqualTo("CANCELLED");
+        assertThat(walk.getArchivedAt()).isNotNull();
+        assertThat(booking.getStatus()).isEqualTo("CANCELLED_FREE");
+        assertThat(booking.getCancellationReason()).isEqualTo("walk_archived");
+    }
+
+    // Construit l'historique photos + commentaires sur la lignée recycled_from.
+    @Test
+    void history_buildsLineageAndComments() {
+        Walk current = publishedWalk(50L, 5L);
+        current.setRecycledFromWalkId(40L);
+        Walk parent = publishedWalk(40L, 5L);
+        WalkRating rating = new WalkRating();
+        setId(rating, 1L);
+        rating.setWalkId(40L);
+        rating.setUserId(8L);
+        rating.setRating(5);
+        rating.setComment("Super balade");
+        when(walkRepository.findById(50L)).thenReturn(Optional.of(current));
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(parent));
+        when(walkPhotoService.listForWalks(List.of(40L)))
+                .thenReturn(List.of(new WalkPhotoResponse(
+                        1L, 40L, "PROMO", "/p", (short) 0, null, 5L, "Org", Instant.now())));
+        when(walkRatingRepository.findByWalkIdInOrderByCreatedAtDesc(List.of(40L))).thenReturn(List.of(rating));
+        when(privacyService.displayName(8L)).thenReturn("Alice");
+
+        WalkHistoryResponse history = walkService.history(50L);
+        assertThat(history.lineageWalkIds()).containsExactly(40L);
+        assertThat(history.photos()).hasSize(1);
+        assertThat(history.ratingComments()).hasSize(1);
+        assertThat(history.ratingComments().getFirst().displayName()).isEqualTo("Alice");
+        assertThat(history.ratingComments().getFirst().comment()).isEqualTo("Super balade");
+    }
+
+    // Liste les balades de l'utilisateur (organisateur / walker).
+    @Test
+    void mine_returnsMappedWalks() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
+        Walk walk = publishedWalk(40L, 5L);
+        when(walkerProfileRepository.findByUserId(5L)).thenReturn(Optional.empty());
+        when(walkRepository.findMine(5L, null)).thenReturn(List.of(walk));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        assertThat(walkService.mine()).hasSize(1);
+        assertThat(walkService.mine().getFirst().id()).isEqualTo(40L);
+    }
+
+    // Recycle une balade terminée vers une nouvelle date.
+    @Test
+    void recycle_createsPublishedClone() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER, Role.COMMUNITY_ORG);
+        Walk source = publishedWalk(40L, 5L);
+        source.setStatus("COMPLETED");
+        source.setArchivedAt(Instant.now().minusSeconds(3600));
+        source.setElevationGainM(10);
+        source.setTerrainType("PARK");
+        source.setDifficultyLevel(3);
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(source));
+        when(profileRepository.findById(5L)).thenAnswer(inv -> {
+            Profile p = new Profile();
+            p.setCommunityOrgStatus("ACTIVE");
+            p.setCompletedWalksCount(10);
+            return Optional.of(p);
+        });
+        when(businessSettingsService.communityWalksThreshold()).thenReturn(3);
+        when(businessSettingsService.communityCapacityMax()).thenReturn(8);
+        when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> {
+            Walk w = inv.getArgument(0);
+            setId(w, 99L);
+            return w;
+        });
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        var response = walkService.recycle(40L, new WalkRecycleRequest(Instant.now().plusSeconds(172800)));
+        assertThat(response.id()).isEqualTo(99L);
+        assertThat(response.recycledFromWalkId()).isEqualTo(40L);
+        assertThat(response.status()).isEqualTo("PUBLISHED");
+        verify(messagingService).ensureWalkThread(any(Walk.class));
+    }
+
+    // Suppression admin d'une balade sans réservation.
+    @Test
+    void deleteByAdmin_removesWalkWithoutBookings() {
+        SecurityTestSupport.authenticate(1L, "admin@barkwalk.fr", Role.USER, Role.ADMIN);
+        Walk walk = publishedWalk(40L, 5L);
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(walk));
+        when(bookingRepository.findByWalkId(40L)).thenReturn(List.of());
+
+        walkService.deleteByAdmin(40L);
+        verify(waitlistEntryRepository).deleteByWalkId(40L);
+        verify(walkRatingRepository).deleteByWalkId(40L);
+        verify(walkRepository).delete(walk);
+    }
+
+    // Démarre une balade publiée.
+    @Test
+    void start_setsInProgress() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
+        Walk walk = publishedWalk(40L, 5L);
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(walk));
+        when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        var response = walkService.start(40L);
+        assertThat(response.status()).isEqualTo("IN_PROGRESS");
+        assertThat(walk.getStartedAt()).isNotNull();
+    }
+
+    // Termine une balade en cours et l'archive.
+    @Test
+    void complete_setsCompletedAndArchived() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
+        Walk walk = publishedWalk(40L, 5L);
+        walk.setStatus("IN_PROGRESS");
+        walk.setStartedAt(Instant.now().minusSeconds(1800));
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(walk));
+        when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        var response = walkService.complete(40L);
+        assertThat(response.status()).isEqualTo("COMPLETED");
+        assertThat(walk.getCompletedAt()).isNotNull();
+        assertThat(walk.getArchivedAt()).isNotNull();
+    }
+
+    // Vue admin catalogue filtrée.
+    @Test
+    void adminOverview_listsWalksForAdmin() {
+        SecurityTestSupport.authenticate(1L, "admin@barkwalk.fr", Role.USER, Role.ADMIN);
+        Walk walk = publishedWalk(40L, 5L);
+        when(walkRepository.findAdminOverview(null, "PUBLISHED")).thenReturn(List.of(walk));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        assertThat(walkService.adminOverview(null, "PUBLISHED")).hasSize(1);
+    }
+
+    // Archives admin.
+    @Test
+    void archived_listsForAdmin() {
+        SecurityTestSupport.authenticate(1L, "admin@barkwalk.fr", Role.USER, Role.ADMIN);
+        Walk walk = publishedWalk(40L, 5L);
+        walk.setArchivedAt(Instant.now());
+        when(walkRepository.findArchived()).thenReturn(List.of(walk));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        assertThat(walkService.archived()).hasSize(1);
+        assertThat(walkService.archivedCatalogue(null)).hasSize(1);
+    }
+
+    // Agenda réservé admin / organisateur.
+    @Test
+    void calendarOverview_listsForOrganizer() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.COMMUNITY_ORG);
+        Walk walk = publishedWalk(40L, 5L);
+        when(walkRepository.findAdminOverview(null, null)).thenReturn(List.of(walk));
+        when(bookingRepository.countByWalkIdAndStatusIn(any(), any())).thenReturn(0L);
+        when(meetingPointRepository.findById(3L)).thenReturn(Optional.of(meetingPoint()));
+        when(cityRepository.findById(1L)).thenReturn(Optional.of(city()));
+
+        assertThat(walkService.calendarOverview()).hasSize(1);
+    }
+
+    // Filtre admin statut inconnu.
+    @Test
+    void adminOverview_rejectsUnknownStatus() {
+        SecurityTestSupport.authenticate(1L, "admin@barkwalk.fr", Role.USER, Role.ADMIN);
+        assertThatThrownBy(() -> walkService.adminOverview(null, "NOPE"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    // Liste les participants pour l'organisateur.
+    @Test
+    void participants_listsNamesForOrganizer() {
+        SecurityTestSupport.authenticate(5L, "org@example.com", Role.USER, Role.MEMBER);
+        Walk walk = publishedWalk(40L, 5L);
+        Booking booking = new Booking();
+        setId(booking, 1L);
+        booking.setWalkId(40L);
+        booking.setUserId(8L);
+        booking.setDogId(3L);
+        booking.setStatus("CONFIRMED");
+        when(walkRepository.findById(40L)).thenReturn(Optional.of(walk));
+        when(bookingRepository.findByWalkId(40L)).thenReturn(List.of(booking));
+        when(dogRepository.findById(3L)).thenAnswer(inv -> {
+            com.barkwalk.dog.domain.Dog dog = new com.barkwalk.dog.domain.Dog();
+            dog.setName("Rex");
+            return Optional.of(dog);
+        });
+        when(privacyService.displayName(8L)).thenReturn("Alice");
+        when(privacyService.phoneForViewer(5L, 8L, 40L)).thenReturn(null);
+
+        var response = walkService.participants(40L);
+        assertThat(response.participants()).hasSize(1);
+        assertThat(response.participants().getFirst().displayName()).isEqualTo("Alice");
+        assertThat(response.participants().getFirst().dogName()).isEqualTo("Rex");
+    }
+
+    private static Walk publishedWalk(long id, long organizerId) {
+        Walk walk = new Walk();
+        setId(walk, id);
+        walk.setOrganizerUserId(organizerId);
+        walk.setStatus("PUBLISHED");
+        walk.setWalkType("COMMUNITY");
+        walk.setCityId(1L);
+        walk.setMeetingPointId(3L);
+        walk.setTitle("Balade");
+        walk.setStartsAt(Instant.now().plusSeconds(86400));
+        walk.setDurationMinutes(60);
+        walk.setCapacity(6);
+        walk.setPriceCents(0);
+        walk.setAcceptedSizes(new String[] {"LARGE"});
+        walk.setAcceptedEnergy(new String[] {"HIGH"});
+        return walk;
     }
 
     // Exige le rôle staff pour créer une balade staff.
