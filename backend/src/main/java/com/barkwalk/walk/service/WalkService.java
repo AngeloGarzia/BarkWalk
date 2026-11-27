@@ -106,8 +106,10 @@ public class WalkService {
 
     @Transactional(readOnly = true)
     public WalkResponse get(Long id) {
-        return toResponse(walkRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND)));
+        Walk walk = walkRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        assertWalkVisible(walk);
+        return toResponse(walk);
     }
 
     // Balades dont l'utilisateur est organisateur (créateur) ou encadrant assigné.
@@ -122,25 +124,10 @@ public class WalkService {
     @Transactional
     public WalkResponse create(WalkCreateRequest request) {
         var principal = SecurityUtils.currentUser();
-        Set<Role> roles = principal.getRoles();
-        boolean admin = roles.contains(Role.ADMIN);
-        boolean staff = roles.contains(Role.WALKER_STAFF) || roles.contains(Role.WALKER_INDEP);
+        boolean admin = principal.getRoles().contains(Role.ADMIN);
 
-        if ("COMMUNITY".equals(request.walkType())) {
-            Profile profile = profileRepository.findById(principal.getId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST));
-            int threshold = businessSettingsService.communityWalksThreshold();
-            boolean orgRole = roles.contains(Role.COMMUNITY_ORG);
-            boolean orgOk = orgRole
-                    || "ACTIVE".equals(profile.getCommunityOrgStatus())
-                    || ("ELIGIBLE".equals(profile.getCommunityOrgStatus())
-                            && profile.getCompletedWalksCount() >= threshold);
-            if (!admin && (!orgOk || profile.isCommunityOrgRevoked())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Community organizer rights required");
-            }
-        } else if (!admin && !staff) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+        assertCreatePayload(request);
+        assertCanPublishWalkType(request.walkType(), request.walkerId());
 
         if (!meetingPointRepository.existsById(request.meetingPointId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meeting point not found");
@@ -149,14 +136,7 @@ public class WalkService {
         // R11 : communautaire plafonnée par configuration ; encadrée = capacité choisie par admin/indépendant.
         assertCapacityAllowed(request.walkType(), request.capacity());
 
-        // R15 : indépendant — docs + charte avant publication.
-        if ("INDEP_GUIDED".equals(request.walkType()) || roles.contains(Role.WALKER_INDEP)) {
-            WalkerProfile walker = walkerProfileRepository.findByUserId(principal.getId()).orElse(null);
-            if (request.walkerId() != null) {
-                walker = walkerProfileRepository.findById(request.walkerId()).orElse(walker);
-            }
-            walkerPublishEligibility.assertCanPublish(walker);
-        }
+        Long walkerId = resolveWalkerIdForCreate(request.walkType(), request.walkerId());
 
         Walk walk = new Walk();
         walk.setCityId(request.cityId());
@@ -168,9 +148,9 @@ public class WalkService {
         walk.setDurationMinutes(request.durationMinutes());
         applyDifficultyInputs(walk, request.durationMinutes(), request.elevationGainM(), request.terrainType());
         walk.setCapacity(request.capacity());
-        walk.setPriceCents(request.priceCents());
+        walk.setPriceCents(normalizePriceCents(request.walkType(), request.priceCents()));
         walk.setNonMemberPriceCents(request.nonMemberPriceCents());
-        walk.setWalkerId(request.walkerId());
+        walk.setWalkerId(walkerId);
         // Créateur = compte qui publie (sert à la note moyenne organisateur).
         walk.setOrganizerUserId(principal.getId());
         walk.setAcceptedSizes(request.acceptedSizes().toArray(String[]::new));
@@ -313,6 +293,19 @@ public class WalkService {
             walk.setStatus("CANCELLED");
             walk.setCancelledByUserId(SecurityUtils.currentUserId());
             walk.setCancellationReason("archived");
+            // Annule les réservations actives (pas de remboursement Stripe ici — stub côté BookingService).
+            for (Booking booking : bookingRepository.findByWalkId(walk.getId())) {
+                if ("CONFIRMED".equals(booking.getStatus()) || "PENDING_PAYMENT".equals(booking.getStatus())) {
+                    booking.setStatus("CANCELLED_FREE");
+                    booking.setCancelledAt(now);
+                    booking.setCancelledByUserId(SecurityUtils.currentUserId());
+                    booking.setCancelledByRole("STAFF");
+                    booking.setCancellationReason("walk_archived");
+                    booking.setCountsTowardOrgThreshold(false);
+                    booking.setCountsTowardMembershipQuota(false);
+                    bookingRepository.save(booking);
+                }
+            }
         }
         walk.setArchivedAt(now);
         walk.setUpdatedAt(now);
@@ -422,6 +415,14 @@ public class WalkService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startsAt must be in the future");
         }
 
+        // R10 / R15 : mêmes droits que create + publication (orga révoqué / indep sans docs bloqués).
+        assertCanPublishWalkType(source.getWalkType(), source.getWalkerId());
+        assertCapacityAllowed(source.getWalkType(), source.getCapacity());
+        if (source.isAllowsDangerCategories()
+                && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can recycle dedicated danger walks");
+        }
+
         Long callerId = SecurityUtils.currentUserId();
         Walk walk = new Walk();
         walk.setCityId(source.getCityId());
@@ -435,7 +436,7 @@ public class WalkService {
         walk.setTerrainType(source.getTerrainType());
         walk.setDifficultyLevel(source.getDifficultyLevel());
         walk.setCapacity(source.getCapacity());
-        walk.setPriceCents(source.getPriceCents());
+        walk.setPriceCents(normalizePriceCents(source.getWalkType(), source.getPriceCents()));
         walk.setNonMemberPriceCents(source.getNonMemberPriceCents());
         walk.setWalkerId(source.getWalkerId());
         walk.setOrganizerUserId(callerId);
@@ -479,11 +480,13 @@ public class WalkService {
                 continue;
             }
             Walk src = byId.get(rating.getWalkId());
+            // Pas d'userId en public : pseudo seulement (évite la fuite d'identifiants).
+            Long exposedUserId = canSeeInternalWalkData() ? rating.getUserId() : null;
             comments.add(new WalkHistoryComment(
                     rating.getWalkId(),
                     src != null ? src.getTitle() : null,
                     src != null ? src.getStartsAt() : null,
-                    rating.getUserId(),
+                    exposedUserId,
                     privacyService.displayName(rating.getUserId()),
                     rating.getRating(),
                     rating.getComment(),
@@ -591,6 +594,118 @@ public class WalkService {
         if (capacity < 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Capacity must be >= 1");
         }
+    }
+
+    /** Visibilité publique : publiée non archivée ; brouillon / privée = staff ou créateur. */
+    private void assertWalkVisible(Walk walk) {
+        boolean publishedVisible = "PUBLISHED".equals(walk.getStatus())
+                || "IN_PROGRESS".equals(walk.getStatus())
+                || "COMPLETED".equals(walk.getStatus());
+        if (publishedVisible && walk.getArchivedAt() == null) {
+            return;
+        }
+        if (canSeeInternalWalkData() || isWalkStaffOrCreator(walk)) {
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    private boolean canSeeInternalWalkData() {
+        Long id = SecurityUtils.currentUserIdOrNull();
+        if (id == null) {
+            return false;
+        }
+        return SecurityUtils.currentUser().getRoles().contains(Role.ADMIN);
+    }
+
+    private boolean isWalkStaffOrCreator(Walk walk) {
+        Long id = SecurityUtils.currentUserIdOrNull();
+        if (id == null) {
+            return false;
+        }
+        return canListParticipants(walk, id);
+    }
+
+    /** R10 / R15 / rôles — partagé entre create et recycle. */
+    private void assertCanPublishWalkType(String walkType, Long walkerId) {
+        var principal = SecurityUtils.currentUser();
+        Set<Role> roles = principal.getRoles();
+        boolean admin = roles.contains(Role.ADMIN);
+        boolean staff = roles.contains(Role.WALKER_STAFF) || roles.contains(Role.WALKER_INDEP);
+
+        if ("COMMUNITY".equals(walkType)) {
+            Profile profile = profileRepository.findById(principal.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST));
+            int threshold = businessSettingsService.communityWalksThreshold();
+            boolean orgRole = roles.contains(Role.COMMUNITY_ORG);
+            boolean orgOk = orgRole
+                    || "ACTIVE".equals(profile.getCommunityOrgStatus())
+                    || ("ELIGIBLE".equals(profile.getCommunityOrgStatus())
+                            && profile.getCompletedWalksCount() >= threshold);
+            if (!admin && (!orgOk || profile.isCommunityOrgRevoked())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Community organizer rights required");
+            }
+            return;
+        }
+
+        if (!admin && !staff) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+
+        // R15 : indépendant — docs + charte avant publication.
+        if ("INDEP_GUIDED".equals(walkType) || roles.contains(Role.WALKER_INDEP)) {
+            WalkerProfile walker = walkerProfileRepository.findByUserId(principal.getId()).orElse(null);
+            if (walkerId != null) {
+                walker = walkerProfileRepository.findById(walkerId).orElse(walker);
+            }
+            walkerPublishEligibility.assertCanPublish(walker);
+        }
+    }
+
+    private void assertCreatePayload(WalkCreateRequest request) {
+        if (request.startsAt() == null || !request.startsAt().isAfter(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startsAt must be in the future");
+        }
+        if (request.durationMinutes() < 15 || request.durationMinutes() > 12 * 60) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "durationMinutes out of range");
+        }
+        if (request.priceCents() < 0
+                || (request.nonMemberPriceCents() != null && request.nonMemberPriceCents() < 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "price cannot be negative");
+        }
+        if ("COMMUNITY".equals(request.walkType()) && request.priceCents() > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Community walks must be free");
+        }
+    }
+
+    private int normalizePriceCents(String walkType, int priceCents) {
+        if ("COMMUNITY".equals(walkType)) {
+            return 0;
+        }
+        return Math.max(0, priceCents);
+    }
+
+    private Long resolveWalkerIdForCreate(String walkType, Long requestedWalkerId) {
+        var principal = SecurityUtils.currentUser();
+        boolean admin = principal.getRoles().contains(Role.ADMIN);
+        if ("COMMUNITY".equals(walkType)) {
+            return null;
+        }
+        if (requestedWalkerId != null) {
+            WalkerProfile target = walkerProfileRepository
+                    .findById(requestedWalkerId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Walker not found"));
+            if (!admin) {
+                WalkerProfile mine = walkerProfileRepository
+                        .findByUserId(principal.getId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Walker profile required"));
+                if (!mine.getId().equals(target.getId())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot assign another walker");
+                }
+            }
+            return target.getId();
+        }
+        return walkerProfileRepository.findByUserId(principal.getId()).map(WalkerProfile::getId).orElse(null);
     }
 
     // Valide un GeoJSON LineString optionnel (2–50 points [lng, lat]).

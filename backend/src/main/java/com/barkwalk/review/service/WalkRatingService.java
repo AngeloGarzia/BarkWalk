@@ -10,10 +10,12 @@ import com.barkwalk.review.dto.ReviewDtos.WalkRatingResponse;
 import com.barkwalk.review.dto.ReviewDtos.WalkRatingSummary;
 import com.barkwalk.review.repository.WalkRatingRepository;
 import com.barkwalk.user.repository.ProfileRepository;
+import com.barkwalk.user.service.CommunityOrgService;
 import com.barkwalk.walk.domain.Walk;
 import com.barkwalk.walk.repository.WalkRepository;
 import com.barkwalk.walker.domain.WalkerProfile;
 import com.barkwalk.walker.repository.WalkerProfileRepository;
+import org.springframework.context.annotation.Lazy;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -41,6 +43,7 @@ public class WalkRatingService {
     private final BusinessSettingsService businessSettingsService;
     private final ProfileRepository profileRepository;
     private final WalkerProfileRepository walkerProfileRepository;
+    private final CommunityOrgService communityOrgService;
 
     public WalkRatingService(
             WalkRatingRepository walkRatingRepository,
@@ -48,11 +51,13 @@ public class WalkRatingService {
             BookingRepository bookingRepository,
             BusinessSettingsService businessSettingsService,
             ProfileRepository profileRepository,
-            WalkerProfileRepository walkerProfileRepository) {
+            WalkerProfileRepository walkerProfileRepository,
+            @Lazy CommunityOrgService communityOrgService) {
         this.walkRatingRepository = walkRatingRepository;
         this.walkRepository = walkRepository;
         this.bookingRepository = bookingRepository;
         this.businessSettingsService = businessSettingsService;
+        this.communityOrgService = communityOrgService;
         this.profileRepository = profileRepository;
         this.walkerProfileRepository = walkerProfileRepository;
     }
@@ -78,6 +83,9 @@ public class WalkRatingService {
         rating.setComment(trimComment(request.comment()));
         WalkRating saved = walkRatingRepository.save(rating);
         refreshCreatorAverage(walk);
+        if (walk.getOrganizerUserId() != null) {
+            communityOrgService.evaluateRevocation(walk.getOrganizerUserId());
+        }
         return toResponse(saved, walk, false);
     }
 
@@ -98,7 +106,8 @@ public class WalkRatingService {
         Walk walk = walkRepository
                 .findById(walkId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Walk not found"));
-        double avg = walkRatingRepository.averageForWalk(walkId);
+        Double avgObj = walkRatingRepository.averageForWalk(walkId);
+        double avg = avgObj != null ? avgObj : 0.0;
         long count = walkRatingRepository.countByWalkId(walkId);
         Integer myRating = null;
         boolean canRate = false;
@@ -214,14 +223,16 @@ public class WalkRatingService {
 
     Instant ratingClosesAt(Walk walk) {
         int days = businessSettingsService.reviewWindowDays();
-        return walk.getStartsAt().plus(days, ChronoUnit.DAYS);
+        Instant start = walk.getStartsAt() != null ? walk.getStartsAt() : Instant.EPOCH;
+        return start.plus(days, ChronoUnit.DAYS);
     }
 
     private Instant walkEnd(Walk walk) {
         if (walk.getCompletedAt() != null) {
             return walk.getCompletedAt();
         }
-        return walk.getStartsAt().plus(Duration.ofMinutes(Math.max(walk.getDurationMinutes(), 0)));
+        Instant start = walk.getStartsAt() != null ? walk.getStartsAt() : Instant.EPOCH;
+        return start.plus(Duration.ofMinutes(Math.max(walk.getDurationMinutes(), 0)));
     }
 
     private static String trimComment(String comment) {

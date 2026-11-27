@@ -1,5 +1,6 @@
 package com.barkwalk.booking.service;
 
+import com.barkwalk.booking.WalkFullWaitlistedException;
 import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.domain.WaitlistEntry;
 import com.barkwalk.booking.dto.BookingDtos.BookingRequest;
@@ -76,7 +77,8 @@ public class BookingService {
     }
 
     // Verrouille la balade le temps de contrôler capacité et doublons (évite le surbooking).
-    @Transactional
+    // R7 : WalkFullWaitlistedException ne doit pas annuler la transaction (entrée WAITING déjà sauvée).
+    @Transactional(noRollbackFor = WalkFullWaitlistedException.class)
     public BookingResponse create(BookingRequest request) {
         Long userId = SecurityUtils.currentUserId();
         Walk walk = walkRepository.findByIdForUpdate(request.walkId())
@@ -112,6 +114,10 @@ public class BookingService {
             }
         }
 
+        if (walk.getStartsAt() == null || !walk.getStartsAt().isAfter(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot book a past walk");
+        }
+
         if (bookingRepository.existsByWalkIdAndDogIdAndStatusNotIn(
                 walk.getId(), dog.getId(), List.of("CANCELLED_FREE", "CANCELLED_LATE"))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already booked");
@@ -120,14 +126,18 @@ public class BookingService {
         long occupied = bookingRepository.countByWalkIdAndStatusIn(walk.getId(),
                 List.of("CONFIRMED", "PENDING_PAYMENT"));
         if (occupied >= walk.getCapacity()) {
+            if (waitlistEntryRepository.existsByWalkIdAndDogIdAndStatusIn(
+                    walk.getId(), dog.getId(), List.of("WAITING", "OFFERED"))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Already on waitlist");
+            }
             WaitlistEntry entry = new WaitlistEntry();
             entry.setWalkId(walk.getId());
             entry.setUserId(userId);
             entry.setDogId(dog.getId());
             entry.setPosition((int) waitlistEntryRepository.countByWalkId(walk.getId()) + 1);
             entry.setStatus("WAITING");
-            waitlistEntryRepository.save(entry);
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Walk full — added to waitlist");
+            waitlistEntryRepository.saveAndFlush(entry);
+            throw new WalkFullWaitlistedException();
         }
 
         boolean member = SecurityUtils.currentUser().getRoles().contains(Role.MEMBER)
@@ -179,9 +189,13 @@ public class BookingService {
                 && !SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        assertCancellable(booking);
         Walk walk = walkRepository.findById(booking.getWalkId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Walk not found"));
         Instant now = Instant.now();
+        if (walk.getStartsAt() != null && !now.isBefore(walk.getStartsAt())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot cancel after walk start");
+        }
         int freeHours = businessSettingsService.cancellationFreeHours();
         Instant freeUntil = walk.getStartsAt().minus(Duration.ofHours(freeHours));
         booking.setCancelledAt(now);
@@ -190,12 +204,14 @@ public class BookingService {
         if (now.isBefore(freeUntil)) {
             // R4 : annulation gratuite jusqu'à X h avant.
             booking.setStatus("CANCELLED_FREE");
+            // Remboursement utilisateur : non branché Stripe (voir refundFully stub).
         } else {
             // R4 : au-delà — pas de remboursement, balade comptée.
             booking.setStatus("CANCELLED_LATE");
             booking.setCountsTowardOrgThreshold(true);
             booking.setCountsTowardMembershipQuota(true);
         }
+        bookingRepository.save(booking);
         waitlistService.offerNext(walk.getId());
         return toResponse(booking);
     }
@@ -205,6 +221,7 @@ public class BookingService {
     public BookingResponse cancelByStaff(Long id, String reason) {
         Booking booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        assertCancellable(booking);
         Walk walk = walkRepository.findById(booking.getWalkId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Walk not found"));
         String role = requireStaffCanceller(walk);
@@ -216,9 +233,18 @@ public class BookingService {
         booking.setCountsTowardOrgThreshold(false);
         booking.setCountsTowardMembershipQuota(false);
         refundFully(booking, reason != null ? reason : "cancelled_by_staff");
+        bookingRepository.save(booking);
         notificationService.notifyWalkCancelledByStaff(walk.getId(), booking.getUserId(), reason);
         waitlistService.offerNext(walk.getId());
         return toResponse(booking);
+    }
+
+    private void assertCancellable(Booking booking) {
+        String status = booking.getStatus();
+        if (!"CONFIRMED".equals(status) && !"PENDING_PAYMENT".equals(status)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Booking cannot be cancelled in status " + status);
+        }
     }
 
     private String requireStaffCanceller(Walk walk) {
@@ -240,6 +266,10 @@ public class BookingService {
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not allowed to cancel this booking");
     }
 
+    /**
+     * Remboursement intégral — <b>stub</b> tant que Stripe Refund n'est pas branché.
+     * Enregistre un marquage local {@code stub-full-refund} : ne pas considérer comme prod-ready.
+     */
     private void refundFully(Booking booking, String reason) {
         if (!booking.isPaymentRequired() || booking.getPriceCents() <= 0) {
             return;
@@ -251,6 +281,7 @@ public class BookingService {
             payment.setRefundAmountCents(payment.getAmountCents());
             payment.setRefundedAt(Instant.now());
             payment.setRefundReason(reason);
+            // TODO(prod): appeler Stripe Refund API ; aujourd'hui aucun flux d'argent réel.
             payment.setRefundProviderId("stub-full-refund");
             paymentRepository.save(payment);
         });

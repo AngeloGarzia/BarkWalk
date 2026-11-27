@@ -89,6 +89,9 @@ Un compte peut cumuler plusieurs rôles.
 
 ### R5 — Annulation par le staff / organisateur / admin
 
+> **Prod** : le remboursement Stripe n’est pas encore branché (`stub-full-refund` en base). À remplacer avant mise en production.
+
+
 - Annulation staff → statut gratuit pour le participant + **remboursement intégral** + notification email.
 - Réservé organisateur / encadrant assigné / admin.
 
@@ -103,6 +106,7 @@ Un compte peut cumuler plusieurs rôles.
 - Place libérée → offre au premier (`OFFERED`) avec délai **Z heures**.
 - Expiration de l’offre → cascade au suivant.
 - Acceptation → réservation confirmée.
+- L’inscription waitlist est **commitée** même si l’API répond 409 (pas de rollback transactionnel).
 
 ### R8 — Pointage / balades terminées / éligibilité organisateur
 

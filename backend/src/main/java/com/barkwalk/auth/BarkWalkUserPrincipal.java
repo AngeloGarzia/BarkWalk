@@ -15,6 +15,7 @@ public class BarkWalkUserPrincipal implements UserDetails {
     private final String email;
     private final String passwordHash;
     private final boolean enabled;
+    private final boolean accountNonLocked;
     private final Set<Role> roles;
 
     public BarkWalkUserPrincipal(User user) {
@@ -22,6 +23,8 @@ public class BarkWalkUserPrincipal implements UserDetails {
         this.email = user.getEmail();
         this.passwordHash = user.getPasswordHash();
         this.enabled = user.isEnabled() && !user.isDeleted();
+        this.accountNonLocked =
+                user.getLockedUntil() == null || user.getLockedUntil().isBefore(java.time.Instant.now());
         this.roles = user.getRoles();
     }
 
@@ -36,7 +39,7 @@ public class BarkWalkUserPrincipal implements UserDetails {
     @Override public String getPassword() { return passwordHash; }
     @Override public String getUsername() { return email; }
     @Override public boolean isAccountNonExpired() { return true; }
-    @Override public boolean isAccountNonLocked() { return true; }
+    @Override public boolean isAccountNonLocked() { return accountNonLocked; }
     @Override public boolean isCredentialsNonExpired() { return true; }
     @Override public boolean isEnabled() { return enabled; }
 }

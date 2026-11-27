@@ -71,14 +71,20 @@ public class CommunityOrgService {
         int maxReports = businessSettingsService.orgMaxReports();
         boolean reportsExceeded = maxReports > 0 && validatedReports >= maxReports;
 
+        // R10 : note moyenne — WalkRating (profil) en priorité, sinon avis entre participants.
         boolean ratingTooLow = false;
         int minReviews = businessSettingsService.orgMinReviews();
-        List<Double> ratings = reviewRepository.findByTargetUserId(userId).stream()
-                .map(r -> (double) r.getRating())
-                .toList();
-        if (ratings.size() >= minReviews) {
-            double avg = ratings.stream().mapToDouble(Double::doubleValue).average().orElse(5.0);
-            ratingTooLow = avg < businessSettingsService.orgMinRating();
+        double minRating = businessSettingsService.orgMinRating();
+        if (profile.getRatingsCount() >= minReviews && profile.getAverageRating() != null) {
+            ratingTooLow = profile.getAverageRating().doubleValue() < minRating;
+        } else {
+            List<Double> ratings = reviewRepository.findByTargetUserId(userId).stream()
+                    .map(r -> (double) r.getRating())
+                    .toList();
+            if (ratings.size() >= minReviews) {
+                double avg = ratings.stream().mapToDouble(Double::doubleValue).average().orElse(5.0);
+                ratingTooLow = avg < minRating;
+            }
         }
 
         if (reportsExceeded || ratingTooLow) {

@@ -15,5 +15,10 @@ import jakarta.persistence.LockModeType;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
     Optional<RefreshToken> findByTokenHashAndRevokedFalse(String tokenHash);
-        void deleteByUserId(Long userId);
+
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
+
+    List<RefreshToken> findByFamilyId(java.util.UUID familyId);
+
+    void deleteByUserId(Long userId);
 }

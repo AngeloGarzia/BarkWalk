@@ -105,6 +105,11 @@ class WalkRecycleServiceTest {
     void recycle_copiesAttributesAndLinksSource() {
         SecurityTestSupport.authenticate(7L, "org@barkwalk.fr", Role.USER, Role.COMMUNITY_ORG);
         Walk source = sourceWalk();
+        com.barkwalk.user.domain.Profile profile = new com.barkwalk.user.domain.Profile();
+        profile.setUserId(7L);
+        profile.setCommunityOrgStatus("ACTIVE");
+        when(profileRepository.findById(7L)).thenReturn(Optional.of(profile));
+        when(businessSettingsService.communityCapacityMax()).thenReturn(8);
         when(walkRepository.findById(21L)).thenReturn(Optional.of(source));
         when(walkRepository.save(any(Walk.class))).thenAnswer(inv -> {
             Walk w = inv.getArgument(0);

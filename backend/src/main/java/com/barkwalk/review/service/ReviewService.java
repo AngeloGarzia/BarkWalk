@@ -45,6 +45,9 @@ public class ReviewService {
     @Transactional
     public ReviewResponse create(ReviewRequest request) {
         Long authorId = SecurityUtils.currentUserId();
+        if (request.targetUserId() == null || authorId.equals(request.targetUserId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot review yourself");
+        }
         if (reviewRepository.existsByWalkIdAndAuthorIdAndTargetUserId(
                 request.walkId(), authorId, request.targetUserId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Already reviewed");

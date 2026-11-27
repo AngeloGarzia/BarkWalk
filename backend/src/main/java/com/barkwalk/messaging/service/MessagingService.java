@@ -20,6 +20,8 @@ import com.barkwalk.messaging.repository.ConversationMemberRepository;
 import com.barkwalk.messaging.repository.ConversationRepository;
 import com.barkwalk.messaging.repository.MessageRepository;
 import com.barkwalk.messaging.repository.UserBlockRepository;
+import com.barkwalk.moderation.domain.Report;
+import com.barkwalk.moderation.repository.ReportRepository;
 import com.barkwalk.user.domain.User;
 import com.barkwalk.user.repository.UserRepository;
 import com.barkwalk.walk.domain.Walk;
@@ -50,6 +52,7 @@ public class MessagingService {
     private final WalkRepository walkRepository;
     private final WalkerProfileRepository walkerProfileRepository;
     private final BusinessSettingsService businessSettingsService;
+    private final ReportRepository reportRepository;
 
     public MessagingService(
             ConversationRepository conversationRepository,
@@ -61,7 +64,8 @@ public class MessagingService {
             AuditService auditService,
             WalkRepository walkRepository,
             WalkerProfileRepository walkerProfileRepository,
-            BusinessSettingsService businessSettingsService) {
+            BusinessSettingsService businessSettingsService,
+            ReportRepository reportRepository) {
         this.conversationRepository = conversationRepository;
         this.memberRepository = memberRepository;
         this.messageRepository = messageRepository;
@@ -72,6 +76,7 @@ public class MessagingService {
         this.walkRepository = walkRepository;
         this.walkerProfileRepository = walkerProfileRepository;
         this.businessSettingsService = businessSettingsService;
+        this.reportRepository = reportRepository;
     }
 
     @Transactional(readOnly = true)
@@ -109,9 +114,21 @@ public class MessagingService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "WALK threads are created with the walk, not manually");
         }
+        // SUPPORT / MODERATION : réservés à l'admin ; pas de walkId arbitraire ni d'invitations libres.
+        if ("SUPPORT".equals(type) || "MODERATION".equals(type)) {
+            if (!SecurityUtils.currentUser().getRoles().contains(Role.ADMIN)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only admin can open " + type + " threads");
+            }
+            if (request.walkId() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, type + " threads cannot reference a walk");
+            }
+            members = validateStaffThreadMembers(me, members);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported conversation type");
+        }
         Conversation conversation = new Conversation();
         conversation.setConversationType(type);
-        conversation.setWalkId(request.walkId());
+        conversation.setWalkId(null);
         conversation = conversationRepository.save(conversation);
         for (Long memberId : members) {
             addMemberIfAbsent(conversation.getId(), memberId);
@@ -279,6 +296,18 @@ public class MessagingService {
         if (reportId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reportId required");
         }
+        Report report = reportRepository
+                .findById(reportId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Report not found"));
+        if (!conversationRepository.existsById(conversationId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found");
+        }
+        // Le signalement doit viser cette conversation (ou un message / membre du fil).
+        boolean okTarget = "CONVERSATION".equalsIgnoreCase(report.getTargetType())
+                && conversationId.equals(report.getTargetId());
+        if (!okTarget) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Report does not cover this conversation");
+        }
         auditService.log(
                 SecurityUtils.currentUserId(),
                 "MSG_ADMIN_ACCESS",
@@ -378,6 +407,24 @@ public class MessagingService {
                 || blockRepository.existsByBlockerIdAndBlockedId(a, b)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Messaging blocked");
         }
+    }
+
+    private List<Long> validateStaffThreadMembers(Long me, List<Long> members) {
+        LinkedHashSet<Long> out = new LinkedHashSet<>();
+        out.add(me);
+        for (Long id : members) {
+            if (id == null || id.equals(me)) {
+                continue;
+            }
+            if (!userRepository.existsById(id)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown member " + id);
+            }
+            out.add(id);
+        }
+        if (out.size() < 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one other member required");
+        }
+        return new ArrayList<>(out);
     }
 
     private boolean hasMemberRole(Long userId) {

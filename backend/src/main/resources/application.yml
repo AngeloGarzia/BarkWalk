@@ -1,6 +1,9 @@
 spring:
   application:
     name: barkwalk-backend
+  profiles:
+    # Local sans SPRING_PROFILES_ACTIVE → secrets faibles autorisés via application-dev.yml
+    default: dev
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration
@@ -49,7 +52,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info
   endpoint:
     health:
       show-details: when_authorized
@@ -62,7 +65,8 @@ barkwalk:
   cors:
     allowed-origins: http://localhost:4200
   jwt:
-    secret: ${JWT_SECRET:barkwalk-dev-secret-key-change-me-32chars-min}
+    # Pas de défaut ici : fourni par application-dev.yml ou JWT_SECRET (obligatoire hors dev).
+    secret: ${JWT_SECRET:}
     access-token-minutes: 15
     refresh-token-days: 14
   s3:
@@ -74,8 +78,8 @@ barkwalk:
     signed-url-minutes: 15
   storage:
     local-path: ${STORAGE_LOCAL_PATH:./data/uploads}
-    # HMAC secret for /api/media signed URLs (override in prod via STORAGE_SIGNING_SECRET)
-    signing-secret: ${STORAGE_SIGNING_SECRET:barkwalk-dev-media-signing-secret-change-me}
+    # Pas de défaut ici : application-dev.yml ou STORAGE_SIGNING_SECRET.
+    signing-secret: ${STORAGE_SIGNING_SECRET:}
   stripe:
     api-key: ${STRIPE_API_KEY:}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET:}

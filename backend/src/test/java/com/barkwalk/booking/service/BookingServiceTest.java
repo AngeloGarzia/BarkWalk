@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.barkwalk.booking.WalkFullWaitlistedException;
 import com.barkwalk.booking.domain.Booking;
 import com.barkwalk.booking.repository.BookingRepository;
 import com.barkwalk.booking.repository.WaitlistEntryRepository;
@@ -484,7 +485,7 @@ class BookingServiceTest {
                 });
     }
 
-    // Place une réservation sur liste d'attente si la balade est pleine.
+    // Place une réservation sur liste d'attente si la balade est pleine (R7, sans rollback).
     @Test
     void create_fullWalkGoesToWaitlist() {
         Walk walk = staffWalk(10L, 1);
@@ -493,12 +494,13 @@ class BookingServiceTest {
         when(dogRepository.findById(5L)).thenReturn(Optional.of(dog));
         when(bookingRepository.existsByWalkIdAndDogIdAndStatusNotIn(eq(10L), eq(5L), any())).thenReturn(false);
         when(bookingRepository.countByWalkIdAndStatusIn(eq(10L), any())).thenReturn(1L);
+        when(waitlistEntryRepository.existsByWalkIdAndDogIdAndStatusIn(eq(10L), eq(5L), any())).thenReturn(false);
         when(waitlistEntryRepository.countByWalkId(10L)).thenReturn(0L);
+        when(waitlistEntryRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
         assertThatThrownBy(() -> bookingService.create(new BookingRequest(10L, 5L, false, false)))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
-                .isEqualTo(HttpStatus.CONFLICT);
-        verify(waitlistEntryRepository).save(any());
+                .isInstanceOf(WalkFullWaitlistedException.class)
+                .hasMessageContaining("waitlist");
+        verify(waitlistEntryRepository).saveAndFlush(any());
     }
 
     private static Walk staffWalk(long id, int capacity) {
@@ -515,6 +517,8 @@ class BookingServiceTest {
         walk.setCapacity(capacity);
         walk.setPriceCents(0);
         walk.setNonMemberPriceCents(1500);
+        walk.setStartsAt(java.time.Instant.now().plus(2, java.time.temporal.ChronoUnit.DAYS));
+        walk.setDurationMinutes(60);
         walk.setAcceptedSizes(new String[] {"LARGE"});
         walk.setAcceptedEnergy(new String[] {"HIGH"});
         return walk;

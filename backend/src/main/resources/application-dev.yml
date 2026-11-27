@@ -1,0 +1,6 @@
+# Profil local / CI : secrets de développement uniquement (jamais en prod).
+barkwalk:
+  jwt:
+    secret: ${JWT_SECRET:barkwalk-dev-secret-key-change-me-32chars-min}
+  storage:
+    signing-secret: ${STORAGE_SIGNING_SECRET:barkwalk-dev-media-signing-secret-change-me}

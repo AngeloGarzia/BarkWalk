@@ -130,7 +130,7 @@ class AuthServiceTest {
         stored.setUserId(1L);
         stored.setTokenHash("abc");
         stored.setExpiresAt(Instant.now().minus(1, ChronoUnit.HOURS));
-        when(refreshTokenRepository.findByTokenHashAndRevokedFalse(anyString())).thenReturn(Optional.of(stored));
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
 
         assertThatThrownBy(() -> authService.refresh("raw-token"))
                 .isInstanceOf(ResponseStatusException.class)
@@ -144,8 +144,9 @@ class AuthServiceTest {
         stubTokenIssue();
         RefreshToken stored = new RefreshToken();
         stored.setUserId(7L);
+        stored.setFamilyId(java.util.UUID.randomUUID());
         stored.setExpiresAt(Instant.now().plus(1, ChronoUnit.DAYS));
-        when(refreshTokenRepository.findByTokenHashAndRevokedFalse(anyString())).thenReturn(Optional.of(stored));
+        when(refreshTokenRepository.findByTokenHash(anyString())).thenReturn(Optional.of(stored));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, "user@example.com", Set.of(Role.USER))));
 
         TokenResponse tokens = authService.refresh("raw-token");

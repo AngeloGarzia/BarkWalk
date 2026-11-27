@@ -12,11 +12,16 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   addDays,
+  addMonths,
   addWeeks,
+  endOfMonth,
+  endOfWeek,
   format,
   isSameDay,
+  isSameMonth,
   isToday,
   startOfDay,
+  startOfMonth,
   startOfWeek,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -110,6 +115,16 @@ interface PositionedEvent {
   timeLabel: string;
 }
 
+interface MonthCell {
+  date: Date;
+  key: string;
+  dayNum: string;
+  isToday: boolean;
+  inMonth: boolean;
+  preview: PositionedEvent[];
+  extraCount: number;
+}
+
 /** Groupe de balades qui se chevauchent : une pastille principale + les autres en pile. */
 interface EventCluster {
   id: string;
@@ -123,6 +138,7 @@ interface EventCluster {
 const DAY_START_HOUR = 6;
 const DAY_END_HOUR = 22;
 const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
+const MONTH_PREVIEW_LIMIT = 3;
 
 @Component({
   selector: 'app-calendar',
@@ -166,6 +182,13 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
             >
               Semaine
             </button>
+            <button
+              type="button"
+              [class.active]="viewMode() === 'month'"
+              (click)="setView('month')"
+            >
+              Mois
+            </button>
           </div>
           <p class="hint">{{ hintText() }}</p>
         </div>
@@ -181,6 +204,56 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
         <p class="state">Chargement de l’agenda…</p>
       } @else if (error()) {
         <p class="state error">{{ error() }}</p>
+      } @else if (viewMode() === 'month') {
+        <div class="month-board" aria-label="Vue mois">
+          <div class="month-weekdays" aria-hidden="true">
+            @for (label of monthWeekdayLabels; track label) {
+              <span>{{ label }}</span>
+            }
+          </div>
+          <div class="month-grid">
+            @for (cell of monthCells(); track cell.key) {
+              <div
+                class="month-cell"
+                [class.outside]="!cell.inMonth"
+                [class.today]="cell.isToday"
+                [class.selected]="isSelectedDay(cell.date)"
+              >
+                <button
+                  type="button"
+                  class="month-day-btn"
+                  [attr.aria-label]="'Voir le ' + monthDayAria(cell.date)"
+                  (click)="openMonthDay(cell.date)"
+                >
+                  <span class="month-day-num">{{ cell.dayNum }}</span>
+                </button>
+                <ul class="month-events">
+                  @for (ev of cell.preview; track ev.walk.id) {
+                    <li>
+                      <button
+                        type="button"
+                        class="m-ev"
+                        [attr.data-status]="ev.colorKey"
+                        [attr.title]="ev.timeLabel + ' · ' + ev.walk.title"
+                        (click)="openWalkDetail(ev.walk.id)"
+                      >
+                        <span class="m-ev-time">{{ ev.timeLabel }}</span>
+                        <span class="m-ev-title">{{ ev.walk.title }}</span>
+                      </button>
+                    </li>
+                  }
+                  @if (cell.extraCount > 0) {
+                    <li>
+                      <button type="button" class="m-more" (click)="openMonthDay(cell.date)">
+                        +{{ cell.extraCount }}
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        </div>
       } @else {
         <div class="cal-board" [attr.data-cols]="days().length">
           <div class="cal-head">
@@ -675,6 +748,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
 
       .legend-item[data-status='PUBLISHED'],
       .event[data-status='PUBLISHED'],
+      .m-ev[data-status='PUBLISHED'],
       .mobile-list li[data-status='PUBLISHED'] {
         background: #e5f3ea;
         border-color: #8fbf9a;
@@ -682,6 +756,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .legend-item[data-status='FULL'],
       .event[data-status='FULL'],
+      .m-ev[data-status='FULL'],
       .mobile-list li[data-status='FULL'] {
         background: #fff1df;
         border-color: #e0a86a;
@@ -689,6 +764,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .legend-item[data-status='IN_PROGRESS'],
       .event[data-status='IN_PROGRESS'],
+      .m-ev[data-status='IN_PROGRESS'],
       .mobile-list li[data-status='IN_PROGRESS'] {
         background: #e7f0fb;
         border-color: #8ab0de;
@@ -696,6 +772,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .legend-item[data-status='COMPLETED'],
       .event[data-status='COMPLETED'],
+      .m-ev[data-status='COMPLETED'],
       .mobile-list li[data-status='COMPLETED'] {
         background: #e8eaf8;
         border-color: #9aa3d6;
@@ -703,6 +780,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .legend-item[data-status='CANCELLED'],
       .event[data-status='CANCELLED'],
+      .m-ev[data-status='CANCELLED'],
       .mobile-list li[data-status='CANCELLED'] {
         background: #fbeaea;
         border-color: #e0a0a0;
@@ -710,6 +788,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .legend-item[data-status='DRAFT'],
       .event[data-status='DRAFT'],
+      .m-ev[data-status='DRAFT'],
       .mobile-list li[data-status='DRAFT'] {
         background: #f4f1ea;
         border-color: #d2c7b4;
@@ -717,6 +796,7 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .legend-item[data-status='ARCHIVED'],
       .event[data-status='ARCHIVED'],
+      .m-ev[data-status='ARCHIVED'],
       .mobile-list li[data-status='ARCHIVED'] {
         background: #f0ece6;
         border-color: #c4b8a8;
@@ -729,6 +809,170 @@ const HOUR_COUNT = DAY_END_HOUR - DAY_START_HOUR;
       }
       .state.error {
         color: var(--danger);
+      }
+
+      .month-board {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .month-weekdays {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-soft);
+      }
+
+      .month-weekdays span {
+        padding: 0.45rem 0.25rem;
+        text-align: center;
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--muted);
+      }
+
+      .month-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-auto-rows: minmax(5.4rem, 1fr);
+      }
+
+      .month-cell {
+        min-height: 5.4rem;
+        border-right: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+        border-bottom: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+        padding: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        background: #fff;
+      }
+
+      .month-cell:nth-child(7n) {
+        border-right: 0;
+      }
+
+      .month-cell.outside {
+        background: color-mix(in srgb, var(--bg) 70%, #fff);
+      }
+
+      .month-cell.outside .month-day-num {
+        color: var(--muted);
+        opacity: 0.65;
+      }
+
+      .month-cell.today {
+        background: color-mix(in srgb, var(--forest-soft) 55%, #fff);
+      }
+
+      .month-cell.selected:not(.today) {
+        outline: 2px solid color-mix(in srgb, var(--forest) 45%, transparent);
+        outline-offset: -2px;
+      }
+
+      .month-day-btn {
+        align-self: flex-start;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      .month-day-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: var(--forest-deep);
+      }
+
+      .month-cell.today .month-day-num {
+        background: var(--forest);
+        color: var(--on-forest);
+      }
+
+      .month-events {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .m-ev {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        width: 100%;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        padding: 0.12rem 0.28rem;
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+        overflow: hidden;
+      }
+
+      .m-ev-time {
+        flex-shrink: 0;
+        font-size: 0.62rem;
+        font-weight: 800;
+      }
+
+      .m-ev-title {
+        font-size: 0.62rem;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .m-more {
+        border: 0;
+        background: transparent;
+        color: var(--forest);
+        font-size: 0.65rem;
+        font-weight: 800;
+        padding: 0.05rem 0.2rem;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      @media (max-width: 719px) {
+        .month-weekdays span {
+          font-size: 0.6rem;
+          padding: 0.35rem 0.1rem;
+        }
+
+        .month-grid {
+          grid-auto-rows: minmax(4.4rem, 1fr);
+        }
+
+        .month-cell {
+          min-height: 4.4rem;
+          padding: 0.15rem;
+        }
+
+        .m-ev-title {
+          display: none;
+        }
+
+        .m-ev {
+          justify-content: center;
+          padding: 0.1rem;
+        }
       }
 
       .cal-board {
@@ -1568,6 +1812,7 @@ export class CalendarComponent implements OnInit {
   protected readonly bookingStatusLabel = bookingStatusLabel;
   protected readonly hourCount = HOUR_COUNT;
   protected readonly hours = Array.from({ length: HOUR_COUNT }, (_, i) => DAY_START_HOUR + i);
+  protected readonly monthWeekdayLabels = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
 
   protected readonly legend = [
     { key: 'PUBLISHED', label: 'Publiée' },
@@ -1583,7 +1828,7 @@ export class CalendarComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly walks = signal<CalWalk[]>([]);
   protected readonly anchor = signal(startOfDay(new Date()));
-  protected readonly viewMode = signal<'day' | 'week'>('day');
+  protected readonly viewMode = signal<'day' | 'week' | 'month'>('day');
   protected readonly now = signal(new Date());
   protected readonly clusterSheet = signal<EventCluster | null>(null);
   protected readonly detailOpen = signal(false);
@@ -1600,14 +1845,47 @@ export class CalendarComponent implements OnInit {
     if (mode === 'day') {
       return [this.toDayColumn(anchor)];
     }
+    if (mode === 'month') {
+      return [];
+    }
     const weekStart = startOfWeek(anchor, { weekStartsOn: 1 });
     return Array.from({ length: 7 }, (_, i) => this.toDayColumn(addDays(weekStart, i)));
   });
 
+  protected readonly monthCells = computed<MonthCell[]>(() => {
+    const anchor = this.anchor();
+    const monthStart = startOfMonth(anchor);
+    const monthEnd = endOfMonth(anchor);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    const cells: MonthCell[] = [];
+    for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
+      const events = this.eventsForDay(d);
+      cells.push({
+        date: d,
+        key: format(d, 'yyyy-MM-dd'),
+        dayNum: format(d, 'd'),
+        isToday: isToday(d),
+        inMonth: isSameMonth(d, anchor),
+        preview: events.slice(0, MONTH_PREVIEW_LIMIT),
+        extraCount: Math.max(0, events.length - MONTH_PREVIEW_LIMIT),
+      });
+    }
+    return cells;
+  });
+
   protected readonly rangeLabel = computed(() => {
+    const mode = this.viewMode();
+    const anchor = this.anchor();
+    if (mode === 'month') {
+      return format(anchor, 'MMMM yyyy', { locale: fr });
+    }
     const cols = this.days();
     if (cols.length === 1) {
       return format(cols[0].date, 'EEEE d MMMM yyyy', { locale: fr });
+    }
+    if (cols.length === 0) {
+      return format(anchor, 'MMMM yyyy', { locale: fr });
     }
     const first = cols[0].date;
     const last = cols[cols.length - 1].date;
@@ -1652,7 +1930,7 @@ export class CalendarComponent implements OnInit {
     });
   }
 
-  protected setView(mode: 'day' | 'week'): void {
+  protected setView(mode: 'day' | 'week' | 'month'): void {
     this.viewMode.set(mode);
     this.closeClusterSheet();
   }
@@ -1664,9 +1942,14 @@ export class CalendarComponent implements OnInit {
 
   protected shift(dir: -1 | 1): void {
     const current = this.anchor();
-    this.anchor.set(
-      this.viewMode() === 'day' ? addDays(current, dir) : addWeeks(current, dir),
-    );
+    const mode = this.viewMode();
+    if (mode === 'day') {
+      this.anchor.set(addDays(current, dir));
+    } else if (mode === 'month') {
+      this.anchor.set(startOfMonth(addMonths(current, dir)));
+    } else {
+      this.anchor.set(addWeeks(current, dir));
+    }
     this.closeClusterSheet();
   }
 
@@ -1676,6 +1959,13 @@ export class CalendarComponent implements OnInit {
     if (window.matchMedia('(max-width: 719px)').matches) {
       this.viewMode.set('day');
     }
+  }
+
+  /** Depuis la vue mois : ouvre le jour sélectionné. */
+  protected openMonthDay(date: Date): void {
+    this.anchor.set(startOfDay(date));
+    this.viewMode.set('day');
+    this.closeClusterSheet();
   }
 
   protected openClusterSheet(event: MouseEvent, cluster: EventCluster): void {
@@ -1771,14 +2061,23 @@ export class CalendarComponent implements OnInit {
     return format(new Date(iso), "EEEE d MMMM yyyy · HH:mm", { locale: fr });
   }
 
+  protected monthDayAria(date: Date): string {
+    return format(date, 'EEEE d MMMM yyyy', { locale: fr });
+  }
+
   protected isSelectedDay(date: Date): boolean {
     return isSameDay(date, this.anchor());
   }
 
   protected hintText(): string {
-    return this.viewMode() === 'day'
-      ? 'Vue jour — passez en semaine sur grand écran'
-      : 'Vue semaine — lun. → dim.';
+    switch (this.viewMode()) {
+      case 'day':
+        return 'Vue jour — créneaux horaires';
+      case 'month':
+        return 'Vue mois — cliquez un jour pour le détail';
+      default:
+        return 'Vue semaine — lun. → dim.';
+    }
   }
 
   protected showNowLine(): boolean {
